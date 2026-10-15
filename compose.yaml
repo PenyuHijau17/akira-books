@@ -1,0 +1,40 @@
+﻿services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: akira-books-app
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://akira_books:akira_books_dev_only@db:5432/akira_books?schema=public
+    volumes:
+      - .:/app
+      - app_node_modules:/app/node_modules
+      - app_next_cache:/app/.next
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    container_name: akira-books-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: akira_books
+      POSTGRES_PASSWORD: akira_books_dev_only
+      POSTGRES_DB: akira_books
+    volumes:
+      - akira_books_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U akira_books -d akira_books"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  app_node_modules:
+  app_next_cache:
+  akira_books_data:
