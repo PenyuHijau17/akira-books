@@ -7,7 +7,6 @@
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: development
       DATABASE_URL: postgresql://akira_books:akira_books_dev_only@db:5432/akira_books?schema=public
     volumes:
       - .:/app
