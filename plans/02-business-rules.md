@@ -1,7 +1,7 @@
 AKIRA BOOKS — BUSINESS RULES
 1. Prinsip Dasar
 Database dan server menjadi sumber kebenaran untuk status, transaksi, stok, pembayaran, dan data operasional.
-Setiap eksemplar buku memiliki identitas unik dan stok 0 atau 1.
+Stok buku dihitung sebagai kuantitas total numerik (integer >= 0) untuk setiap data judul buku gabungan tanpa memisahkan rincian kondisi fisik per item. .
 Setiap perubahan sensitif harus melalui validasi hak akses dan memiliki riwayat yang sesuai.
 Status pesanan utama, status bukti pembayaran, status jadwal, dan status refund merupakan hal berbeda dan tidak boleh digabung.
 Pesanan yang sudah dibatalkan bersifat final dan tidak dapat diaktifkan kembali.

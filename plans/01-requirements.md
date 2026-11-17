@@ -1,392 +1,13 @@
 AKIRA BOOKS — REQUIREMENTS
 1. Tujuan Proyek
 Akira Books adalah website untuk membantu pengelolaan toko buku bacaan original dan bekas, mulai dari katalog, pesanan, pembayaran, jadwal pengambilan, hingga pencatatan transaksi.
-Website mendukung kegiatan penjualan langsung di booth CFD yang beroperasi setiap Minggu pagi dan berakhir pukul 09.00.
-Website bukan marketplace. Pengelolaan toko dilakukan oleh admin, sedangkan pelanggan dapat melihat katalog dan melakukan pemesanan melalui website.
-Admin utama dapat menutup dan membuka toko secara manual untuk keadaan toko libur. Saat toko tutup, pelanggan tetap dapat melihat katalog tetapi tidak dapat membuat pesanan baru.
-2. Teknologi
-Docker sebagai lingkungan aplikasi.
-Next.js sebagai framework website.
-TypeScript sebagai bahasa pemrograman.
-Prisma sebagai ORM.
-PostgreSQL sebagai database.
-Fondasi project Next.js, Prisma, dan Docker sudah tersedia; fitur bisnis belum diimplementasikan sepenuhnya.
-3. Pengguna dan Hak Akses
-3.1 Pengunjung
-Melihat beranda, katalog, detail buku, dan informasi toko.
-Mencari dan menyaring buku.
-Harus masuk atau membuat akun sebelum melakukan pemesanan.
-3.2 Pelanggan
-Mengelola nama, kata sandi, dan nomor WhatsApp opsional.
-Email tidak dapat diubah melalui pengaturan profil.
-Memulihkan kata sandi melalui tautan yang dikirim ke email terdaftar.
-Memesan beberapa buku sekaligus.
-Melihat pesanan aktif dan riwayat pesanan.
-Mengunggah dan mengganti bukti pembayaran sesuai aturan.
-Memilih atau mengajukan perubahan jadwal pengambilan.
-Mengajukan perubahan jadwal pengambilan berkali-kali dan membatalkan permintaan perubahan yang masih menunggu keputusan.
-Melihat notifikasi dan status pesanan.
-Mengajukan pembatalan akun sesuai ketentuan.
-Tidak dapat membatalkan sendiri pesanan yang pembayarannya sudah diverifikasi.
-Ketika toko tutup, pelanggan tetap dapat mendaftar, masuk, melihat katalog, mengelola akun, dan menambah buku ke keranjang, tetapi tidak dapat membuat pesanan baru.
-Pelanggan hanya melihat status dan alasan penutupan yang sedang berlaku, bukan riwayat historis.
-3.3 Admin Biasa
-Mengelola buku, foto, kategori, harga jual, dan kondisi buku.
-Mengubah harga jual atau kondisi buku meskipun masih ada pesanan aktif. Pesanan yang sudah dibuat tetap memakai snapshot harga dan kondisi saat pesanan dibuat.
-Mengelola pesanan dan jadwal pengambilan.
-Memeriksa bukti pembayaran dan mengirim hasil pemeriksaan awal.
-Mencatat penjualan langsung atau offline.
-Menangani permintaan pelanggan sesuai hak akses.
-Melihat status toko dan riwayat penutupan toko.
-Dashboard admin biasa menampilkan status toko tanpa kontrol untuk mengubahnya.
-Tidak dapat menutup toko, membuka toko, atau mengubah alasan penutupan.
-Tidak dapat melihat atau mengubah modal buku, laba, atau perhitungan keuntungan.
-Tidak dapat melihat laporan keuangan.
-Tidak dapat melihat audit administratif.
-Tidak dapat mengelola akun admin.
-Tidak dapat menyetujui pembayaran pada tahap final.
-Tidak dapat menyetujui pengembalian dana.
-Tidak dapat menggabungkan data buku duplikat.
-Dapat membatalkan pesanan yang belum dibayar dengan alasan wajib, audit wajib, dan notifikasi kepada Admin Utama.
-Dapat membatalkan pesanan yang sudah dibayar tetapi belum memperoleh persetujuan akhir Admin Utama, dengan alasan wajib, audit wajib, dan notifikasi kepada Admin Utama.
-Setelah pembayaran memperoleh persetujuan akhir Admin Utama, pembatalan pesanan hanya dapat ditangani Admin Utama.
-3.4 Admin Utama
-Admin Utama adalah pemilik toko dan memiliki kewenangan operasional admin.
-Dalam kondisi khusus ketika hanya ada satu Admin Utama, Admin Utama tersebut boleh menyelesaikan persetujuan yang biasanya memerlukan pemisahan tugas atau admin lain. Proses wajib menyertakan alasan dan dicatat dalam audit administratif.
-Hanya Admin Utama yang dapat melihat audit administratif.
-Mengelola akun dan hak akses admin.
-Dapat menonaktifkan akun admin sampai diaktifkan kembali secara manual dan dapat menghapus akun admin secara permanen. Riwayat tindakan dan transaksi sebelumnya tetap tersimpan dan dapat ditelusuri.
-Melihat laporan penjualan dan keuangan.
-Mengelola serta mengoreksi modal setiap eksemplar buku dengan alasan dan riwayat nilai sebelumnya.
-Melihat perhitungan ulang keuntungan berdasarkan modal terbaru sebagai pembanding, tanpa menimpa keuntungan historis.
-Menyetujui pembayaran pada tahap final.
-Menyetujui pembatalan pesanan yang sudah dibayar setelah persetujuan akhir pembayaran.
-Menyetujui pengembalian dana.
-Mengelola QRIS aktif dan mengubah tenggat pembayaran global untuk pesanan baru.
-Menggabungkan data buku duplikat dengan tetap mempertahankan keterhubungan riwayat pesanan dan transaksi.
-Mengelola backup dan pemulihan data.
-Melakukan koreksi data sensitif dengan alasan dan riwayat yang tercatat.
-Menutup dan membuka toko secara manual beserta alasan penutupan.
-Menghapus riwayat penutupan toko yang lama atau sudah tidak aktif, baik satu catatan maupun seluruh riwayat, dengan audit administratif terpisah.
-Memulihkan akun menggunakan email pemulihan dan kode pemulihan cadangan yang disimpan dengan aman.
-4. Katalog dan Pengelolaan Buku
-Setiap eksemplar fisik memiliki data tersendiri, meskipun judulnya sama dengan buku lain. Setiap eksemplar memiliki stok 0 atau 1.
-Data buku meliputi:
-Kode atau ID unik.
-Judul dan penulis.
-Penerbit dan tahun terbit.
-Satu atau beberapa kategori.
-Foto buku.
-Kondisi buku.
-Deskripsi tambahan.
-Harga jual.
-Modal, yang hanya dapat dilihat dan dikelola admin utama.
-Status ketersediaan dan riwayat perubahan.
-Pilihan kondisi:
-Baru.
-Sangat Baik.
-Baik.
-Cukup.
-Admin dapat menambahkan deskripsi kerusakan atau kelebihan buku secara opsional.
-Kartu buku menampilkan foto, judul, penulis, harga, dan ketersediaan. Halaman detail menampilkan informasi buku yang lebih lengkap.
-Pelanggan dapat mencari berdasarkan judul atau penulis serta menyaring berdasarkan kategori, kondisi, dan rentang harga.
-Status buku meliputi:
-Tersedia.
-Sedang Dipesan.
-Terjual.
-Nonaktif.
-Buku yang sedang dipesan tetap terlihat, tetapi tidak dapat dipesan pelanggan lain. Buku terjual dan nonaktif tidak ditampilkan sebagai buku tersedia.
-Buku tanpa riwayat transaksi atau pesanan dapat dihapus permanen sesuai aturan sistem. Buku yang memiliki riwayat harus dinonaktifkan, bukan dihapus permanen.
-Buku yang dibatalkan pesanannya hanya kembali tersedia jika masih aktif dan layak dijual.
-Admin boleh mengubah harga jual atau kondisi buku meskipun masih ada pesanan aktif. Pesanan yang sudah dibuat tetap menggunakan snapshot harga dan kondisi pada saat pesanan dibuat; perubahan katalog tidak mengubah pesanan lama.
-Hanya Admin Utama yang boleh menggabungkan data buku duplikat. Penggabungan wajib mempertahankan keterhubungan seluruh riwayat pesanan dan transaksi yang terdampak.
-Setiap perubahan atau koreksi modal oleh Admin Utama wajib disertai alasan dan mempertahankan riwayat nilai modal sebelumnya.
-Informasi modal dan keuntungan hanya dapat diakses Admin Utama. Respons API, DTO, laporan, atau tampilan yang ditujukan kepada Admin biasa tidak boleh memuat informasi tersebut.
-Ketika toko tutup, katalog tetap dapat dilihat pelanggan dan perubahan katalog langsung terlihat oleh pelanggan meskipun toko masih tutup.
-5. Pemesanan
-Pelanggan dapat memilih beberapa buku melalui keranjang.
-Memasukkan buku ke keranjang belum memesan atau menahan stok. Stok baru ditahan ketika pelanggan menekan tombol Buat Pesanan.
-Saat pesanan dibuat:
-Server memeriksa ketersediaan buku.
-Sistem mencegah dua pelanggan mendapatkan eksemplar terakhir yang sama.
-Setiap buku yang berhasil dipesan ditahan untuk pesanan tersebut.
-Informasi buku, harga, kondisi, dan tenggat pembayaran disimpan sebagai snapshot pada saat pesanan dibuat.
-Status pesanan utama awal adalah Menunggu Pembayaran.
-Status jadwal awal adalah Menunggu Konfirmasi.
-Status pesanan utama terpisah dari status bukti pembayaran, status jadwal pengambilan, dan status pengembalian dana.
-Alur status pesanan utama: Menunggu Pembayaran → Sudah Dibayar → Menunggu Diambil → Selesai. Dibatalkan merupakan status akhir.
-Setelah pembayaran memperoleh persetujuan final, status pesanan menjadi Sudah Dibayar. Status tetap Sudah Dibayar sampai admin mengonfirmasi jadwal pengambilan; setelah jadwal dikonfirmasi, status menjadi Menunggu Diambil. Setelah buku benar-benar diserahkan, status menjadi Selesai.
-Menunggu Konfirmasi hanya digunakan sebagai status jadwal, bukan status pesanan utama.
-Sistem harus mencegah pesanan ganda akibat tombol diklik berulang atau permintaan yang dikirim ulang setelah koneksi bermasalah.
-Jika pesanan sudah tersimpan tetapi konfirmasi gagal diterima pelanggan, pengulangan permintaan yang sama harus mengembalikan pesanan sebelumnya, bukan membuat pesanan baru.
-Pelanggan boleh memiliki beberapa pesanan aktif sekaligus. Penggabungan jadwal pengambilan dapat diajukan kepada admin, tetapi setiap pesanan tetap memiliki status, pembayaran, dan riwayat masing-masing.
-Ketika pelanggan menekan tombol Buat Pesanan, server memeriksa status toko. Jika toko tutup, pesanan ditolak dan pelanggan diberi pemberitahuan.
-Jika status toko tidak dapat dipastikan, checkout diblokir sementara sampai status terkonfirmasi. Server tetap menolak pembuatan pesanan meskipun toko ditutup saat pelanggan sedang membuka halaman checkout.
-Buku di keranjang tidak otomatis terhapus ketika stok habis, harga berubah, atau buku dinonaktifkan. Stok, harga, dan status buku diperiksa ulang saat pembuatan pesanan, dan pelanggan diberi tahu jika ada perubahan yang menghalangi pemesanan.
-Keranjang dipertahankan ketika pesanan ditolak.
-Jika buku terjual secara offline, buku tersebut harus dihapus dari keranjang pelanggan yang terdampak dan pelanggan diberi tahu. Jika keranjang masih berisi buku lain, pelanggan wajib memeriksa dan menyetujui kembali keranjang sebelum melanjutkan pesanan. Persetujuan ulang dicatat sebagai snapshot keranjang yang disetujui.
-6. Pembayaran dan QRIS
-Pembayaran dilakukan melalui QRIS di luar sistem. Pelanggan mengunggah tangkapan layar bukti pembayaran ke website.
-QRIS aktif dikelola oleh admin utama. Ketika QRIS diganti, gambar lama disimpan dalam riwayat dan tidak lagi dianggap sebagai QRIS aktif. Pelanggan yang memiliki pesanan aktif diberi pemberitahuan agar tidak menggunakan gambar lama yang tersimpan di perangkatnya.
-QRIS ditampilkan pada informasi toko ketika pelanggan memiliki pesanan yang menunggu pembayaran dan pada detail pesanan terkait.
-Status bukti pembayaran:
-Belum Diunggah.
-Menunggu Verifikasi.
-Perlu Bukti Baru.
-Terverifikasi.
-Bukti pembayaran hanya dapat dilihat pelanggan pemilik pesanan dan admin yang berwenang.
-Riwayat bukti disimpan. Bukti terbaru menjadi bukti aktif sesuai status pesanan.
-Admin biasa memeriksa bukti dan mengirim hasil pemeriksaan awal. Setelah disetujui Admin Utama, status bukti menjadi Terverifikasi dan status pesanan utama menjadi Sudah Dibayar.
-Pemeriksa awal dan pemberi persetujuan final sedapat mungkin berbeda. Dalam kondisi khusus ketika hanya ada satu Admin Utama, Admin Utama tersebut boleh menyelesaikan persetujuan final dengan alasan wajib dan catatan audit. Sistem tidak boleh menyetujui pembayaran secara otomatis.
-Jika bukti ditolak, admin wajib memberikan alasan dan tenggat penggantian. Pelanggan diberi notifikasi dan dapat mengunggah bukti baru. Bukti baru kembali berstatus Menunggu Verifikasi. Bukti lama tetap tersimpan dan bukti terbaru menjadi bukti aktif.
-Pelanggan yang mengunggah bukti tepat waktu tetap dianggap tepat waktu meskipun admin terlambat memeriksa. Pesanan tidak boleh dibatalkan hanya karena pemeriksaan belum selesai.
-Satu pembayaran dapat digunakan untuk beberapa pesanan jika memang merupakan satu transfer yang mencakup semuanya. Hubungan antara pembayaran dan setiap pesanan harus tercatat.
-Metode pembayaran yang tersedia adalah QRIS dan pembayaran langsung saat pelanggan datang ke booth CFD.
-Pesanan dengan metode pembayaran langsung tidak memakai tenggat QRIS. Pesanan tersebut mengikuti batas waktu pengambilan yang disetujui admin. Jika batas tersebut terlewat, admin memutuskan apakah reservasi diperpanjang atau pesanan dibatalkan.
-Pembayaran langsung di CFD boleh dicatat oleh Admin biasa tanpa persetujuan akhir Admin Utama karena uang diterima langsung di hadapan admin. Ini adalah pengecualian alur persetujuan pembayaran, bukan alasan untuk menghilangkan status pesanan utama.
-Pada pembayaran langsung, admin mencatat pembayaran dan penyerahan buku sebagai kejadian yang tercatat. Status pesanan tetap mengikuti alur utama. Jika pembayaran dan penyerahan terjadi pada waktu yang sama, sistem boleh mencatat transisi Menunggu Pembayaran → Sudah Dibayar → Menunggu Diambil → Selesai dalam satu operasi atomik dengan riwayat setiap kejadian. Buku tidak dianggap diserahkan sebelum admin mengonfirmasi penyerahan.
-Pelanggan boleh mengajukan perubahan metode pembayaran setelah pesanan dibuat. Admin biasa boleh menyetujui atau menolak permintaan tersebut, dan seluruh perubahan dicatat.
-Setelah pembayaran disetujui, perubahan metode pembayaran biasa tidak diperbolehkan. Koreksi metode pembayaran setelah pembayaran disetujui hanya dapat dilakukan oleh Admin Utama dengan alasan wajib dan catatan audit.
-Koreksi catatan pembayaran yang telah disetujui hanya boleh dilakukan Admin Utama, wajib memiliki alasan, dan harus mempertahankan persetujuan serta riwayat awal. Jumlah uang pada pembayaran yang sudah disetujui tidak boleh diubah melalui proses koreksi.
-7. Tenggat Pembayaran
-Sistem memiliki tenggat pembayaran global dan tenggat khusus per pesanan. Hanya Admin Utama yang boleh mengubah tenggat global. Perubahan tenggat global hanya berlaku untuk pesanan baru, bukan mengubah tenggat pesanan lama. Pesanan yang sudah dibuat memakai snapshot tenggat yang tersimpan saat pesanan dibuat. Perubahan tenggat global tidak memerlukan catatan perubahan khusus.
-Tenggat pembayaran QRIS adalah 24 jam sejak pesanan dibuat.
-Pelanggan dapat meminta perpanjangan tenggat melalui website atau WhatsApp. Admin biasa boleh menyetujui atau menolak permintaan perpanjangan, termasuk yang disampaikan melalui WhatsApp. Permintaan, alasan, keputusan, dan tenggat baru wajib dicatat di website.
-Jika bukti belum diunggah sampai tenggat berakhir, sistem membatalkan pesanan otomatis dengan alasan Batas waktu pembayaran terlewati, mencatat aktor System, waktu, dan riwayat, lalu memberi notifikasi kepada pelanggan.
-Tenggat QRIS dijeda selama permintaan perubahan metode pembayaran menunggu persetujuan admin. Jika permintaan ditolak, hitung mundur dilanjutkan dari sisa waktu yang tersimpan, bukan dimulai kembali dari nol.
-Jika bukti berhasil diunggah sebelum tenggat tetapi belum selesai diperiksa, pelanggan tetap dianggap mengunggah tepat waktu. Pesanan tidak boleh dibatalkan hanya karena pemeriksaan belum selesai. Admin Utama menyelesaikan persetujuan atau penolakan bukti; penolakan wajib disertai alasan.
-Sistem mengingatkan admin setiap 2 jam selama bukti yang diunggah tepat waktu masih menunggu pemeriksaan. Pengingat harus bertahan setelah server restart dan tidak boleh terkirim berulang kali secara tidak sengaja. Rancangan teknis yang disarankan adalah jadwal persisten di database, mekanisme retry, dan kunci idempotensi untuk mencegah duplikasi.
-Keberhasilan unggahan ditentukan berdasarkan waktu yang tercatat di server. Bukti yang baru diunggah setelah pesanan resmi dibatalkan tidak boleh mengaktifkan kembali pesanan tersebut.
-Pengunggahan bukti dan pembatalan harus ditangani secara aman ketika keduanya terjadi hampir bersamaan.
-8. Jadwal Pengambilan
-Pengambilan dilakukan pada hari Minggu. Pelanggan memilih tanggal, bukan jam. Sistem memvalidasi bahwa tanggal yang dipilih adalah hari Minggu di masa mendatang.
-Booth tutup pukul 09.00.
-Status jadwal meliputi:
-Menunggu Konfirmasi.
-Disetujui.
-Perlu Tanggal Baru.
-Perubahan Jadwal Menunggu Persetujuan.
-Status jadwal terpisah dari status pesanan utama.
-Setelah pembayaran memperoleh persetujuan final, status pesanan tetap Sudah Dibayar sampai admin mengonfirmasi jadwal pengambilan. Setelah jadwal dikonfirmasi, status pesanan menjadi Menunggu Diambil. Setelah buku benar-benar diserahkan, status menjadi Selesai.
-Admin dapat menyetujui atau menolak tanggal. Penolakan wajib disertai alasan, kemudian pelanggan memilih tanggal lain.
-Admin juga dapat mengusulkan perubahan jadwal dengan alasan. Jadwal baru berlaku setelah pelanggan menyetujuinya.
-Pelanggan boleh menolak usulan jadwal dari admin dengan alasan, kemudian mengajukan tanggal baru.
-Pelanggan boleh mengajukan perubahan jadwal berkali-kali dan boleh membatalkan permintaan perubahan yang masih menunggu keputusan.
-Jika tanggal terlewati sebelum keputusan dibuat, pelanggan harus memilih tanggal baru.
-Jika pelanggan tidak datang sebelum pukul 09.00, admin mendapat notifikasi dan menentukan apakah pesanan ditunggu, dijadwalkan ulang, atau dibatalkan. Pembatalan wajib disertai alasan. Sistem tidak otomatis membatalkan hanya karena pelanggan tidak datang.
-Jika pesanan ditunggu, admin menetapkan tenggat baru dan alasan. Buku tetap direservasi sampai pembatalan resmi dilakukan.
-Pesanan baru berstatus Selesai setelah buku benar-benar diserahkan dan admin menekan tombol Selesai.
-9. Pembatalan dan Pengembalian Dana
-Pelanggan dapat membatalkan pesanan yang belum dibayar sesuai aturan. Alasan pembatalan dari pelanggan bersifat opsional dan harus melalui konfirmasi.
-Admin biasa boleh membatalkan pesanan yang belum dibayar. Alasan pembatalan wajib dicatat, tindakan dicatat dalam audit administratif, dan Admin Utama harus diberi notifikasi.
-Admin biasa boleh membatalkan pesanan yang sudah dibayar tetapi belum memperoleh persetujuan akhir Admin Utama. Alasan wajib, audit wajib, dan Admin Utama harus diberi notifikasi.
-Setelah pembayaran memperoleh persetujuan akhir Admin Utama, pembatalan pesanan hanya boleh ditangani Admin Utama. Jika hanya ada satu Admin Utama dan ia mengusulkan sekaligus menyetujui, alasan dan pengecualian dicatat dalam audit administratif.
-Pengembalian dana adalah proses terpisah. Pembatalan tidak otomatis berarti uang telah dikembalikan. Hanya Admin Utama yang boleh menyetujui pengembalian dana.
-Pesanan selesai yang bukunya sudah diserahkan tidak boleh dibatalkan seperti pesanan biasa. Koreksi catatan hanya boleh dilakukan Admin Utama dengan alasan dan riwayat perubahan. Koreksi data tidak otomatis mengaktifkan kembali pesanan atau menandakan bahwa dana sudah dikembalikan.
-Status pengembalian dana:
-Tidak Berlaku.
-Perlu Diproses.
-Dikembalikan Sebagian.
-Selesai.
-Setiap pengembalian dana mencatat jumlah, waktu, admin yang mencatat, dan riwayat transaksi. Pengembalian sebagian atau beberapa kali harus tetap dapat ditelusuri.
-Pesanan yang dibatalkan bersifat final dan tidak dapat diaktifkan kembali. Pelanggan dapat membuat pesanan baru jika buku tersedia.
-10. Penjualan Offline
-Admin dapat mencatat penjualan buku yang terjadi langsung di booth tanpa melalui alur pesanan online atau unggahan bukti pembayaran.
-Catatan penjualan offline meliputi buku, harga jual aktual, waktu, admin pencatat, dan jenis transaksi Offline. Nilai modal dan laba dihitung dari data buku dan hanya dapat dilihat Admin Utama.
-Harga jual offline dapat berbeda dari harga katalog.
-Koreksi transaksi penjualan offline yang sudah selesai hanya dapat dilakukan Admin Utama dengan alasan wajib. Nilai lama, nilai baru, waktu, pelaku, dan riwayat perubahan harus tercatat.
-Setiap perubahan atau koreksi transaksi yang sudah selesai wajib memiliki alasan dan riwayat perubahan.
-Modal dan laba hanya dapat dilihat Admin Utama. Respons untuk Admin biasa tidak boleh memuat modal atau laba.
-11. Laporan Keuangan
-Laporan hanya dapat diakses Admin Utama.
-Laporan MVP mencakup:
-Penjualan harian, bulanan, dan tahunan.
-Total pembayaran yang diterima dan diverifikasi.
-Jumlah buku yang terjual.
-Riwayat transaksi.
-Laba kotor dari penjualan yang selesai.
-Pemisahan transaksi online dan offline.
-Riwayat pembatalan dan pengembalian dana.
-Pembayaran yang telah diverifikasi tetapi bukunya belum diserahkan masuk ke catatan pembayaran diterima, bukan penjualan selesai.
-Penjualan dan laba terealisasi dicatat setelah buku diserahkan dan pesanan ditandai Selesai, atau setelah penjualan offline dicatat sebagai transaksi selesai.
-Laba kotor dihitung dari harga jual aktual dikurangi modal.
-Jika modal dikoreksi setelah transaksi, sistem harus mempertahankan laba historis pada saat transaksi dan menyediakan perhitungan laba berdasarkan modal terbaru sebagai pembanding, tanpa menimpa laba historis. Kedua nilai hanya dapat diakses Admin Utama.
-Koreksi modal wajib memiliki alasan dan menyimpan nilai lama, nilai baru, waktu, admin yang melakukan koreksi, serta riwayat perubahan.
-Hanya Admin Utama yang boleh menggabungkan data buku duplikat. Penggabungan wajib mempertahankan keterhubungan seluruh riwayat pesanan dan transaksi yang terdampak.
-Ekspor Excel dan laporan buku terlaris tidak termasuk kebutuhan MVP.
-12. Notifikasi
-Notifikasi website menjadi prioritas awal. Integrasi otomatis WhatsApp bukan bagian MVP. Permintaan melalui WhatsApp ditangani secara manual dan dicatat di website.
-Notifikasi mencakup pesanan baru, pembayaran, bukti pembayaran, keputusan jadwal, perubahan tenggat, pembatalan, pelanggan yang tidak datang, dan tindakan penting lainnya.
-Sistem mengingatkan admin setiap 2 jam selama bukti yang diunggah tepat waktu masih menunggu pemeriksaan. Pengingat harus bertahan setelah server restart dan tidak boleh terkirim berulang kali secara tidak sengaja.
-Setiap notifikasi mencatat penerima, isi, waktu, status dibaca, serta riwayat yang diperlukan.
-Notifikasi yang gagal dikirim harus disimpan dan dicoba kembali dengan jeda yang makin panjang. Jika terus gagal, sistem menandainya gagal dan memberikan peringatan kepada admin.
-Percobaan ulang tidak boleh membuat notifikasi duplikat atau membuat ulang pesanan. Admin tetap dapat melihat daftar pesanan melalui dashboard.
-Notifikasi sejenis boleh dikelompokkan agar ringkas, tetapi setiap kejadian dan riwayatnya tetap tersedia. Jumlah notifikasi belum dibaca harus akurat.
-Jika beberapa admin menangani pesanan yang sama, sistem menampilkan siapa yang sedang menangani pesanan. Admin lain tetap dapat melihat detail, tetapi perubahan yang bertentangan harus dicegah.
-Penanda penanganan berlaku sementara dan kedaluwarsa otomatis jika admin tidak aktif. Kedaluwarsa penanda tidak mengubah status pesanan atau membatalkan tindakan yang sudah tersimpan.
-13. Keamanan dan Akun
-Login admin menggunakan email dan kata sandi. OTP digunakan untuk tindakan sensitif tertentu, bukan setiap kali login. Menutup dan membuka toko cukup menggunakan konfirmasi biasa dan tidak termasuk tindakan yang wajib memakai verifikasi ulang.
-Tindakan sensitif tertentu memerlukan verifikasi ulang menggunakan kata sandi atau OTP. Percobaan kata sandi atau OTP yang gagal berulang harus memicu pembatasan sementara.
-Pemulihan Admin Utama menggunakan email pemulihan dan kode pemulihan cadangan yang disimpan dengan aman, bukan teks biasa di database.
-Pemulihan kata sandi pelanggan menggunakan tautan yang dikirim melalui email terdaftar.
-Sistem menerapkan pembatasan percobaan login, pembatasan percobaan OTP, pengelolaan sesi, validasi server, dan pemeriksaan hak akses untuk setiap tindakan sensitif.
-Pelanggan dapat meminta penghapusan akun. Jika masih ada pesanan aktif atau kewajiban yang belum selesai, penghapusan ditunda. Pelanggan tetap dapat masuk dan mengelola pesanan selama penundaan serta dapat membatalkan permintaan penghapusan sebelum proses final. Catatan transaksi yang wajib dipertahankan tidak ikut terhapus.
-Admin dapat menonaktifkan akun pelanggan dengan alasan dan riwayat. Penonaktifan sementara harus memiliki aturan kedaluwarsa atau perubahan status yang jelas.
-Akun admin dapat dinonaktifkan sampai diaktifkan kembali secara manual. Admin Utama juga boleh menghapus akun admin secara permanen. Penonaktifan atau penghapusan akun admin tidak menghilangkan riwayat tindakan maupun transaksi sebelumnya; riwayat tetap dapat ditelusuri. Penonaktifan admin mencabut akses login dan sesi aktif. Admin Utama adalah pemilik toko dan pengecualian satu Admin Utama berlaku sesuai aturan.
-14. Koreksi dan Audit Riwayat
-Perubahan sensitif harus mencatat pelaku, waktu, nilai sebelum dan sesudah, serta alasan jika diwajibkan.
-Audit administratif bersifat append-only; aplikasi tidak menyediakan fungsi untuk mengubah atau menghapus catatan yang telah tercatat. Hanya Admin Utama yang dapat melihat audit administratif.
-Riwayat Toko Libur yang lama atau tidak aktif dapat dihapus oleh Admin Utama sesuai aturan; audit administratif dicatat terpisah dan tidak ikut terhapus.
-Koreksi status pesanan yang sudah selesai hanya boleh mengembalikan status ke status sebelumnya yang tercatat, hanya oleh Admin Utama, disertai alasan dan riwayat.
-Koreksi catatan pembayaran yang telah disetujui hanya boleh dilakukan Admin Utama, wajib alasan, mempertahankan persetujuan dan riwayat awal; jumlah uang tidak boleh diubah.
-Koreksi data tidak otomatis mengubah status pesanan, menganggap pembayaran sudah dikembalikan, atau mengaktifkan kembali pesanan yang dibatalkan.
-Tindakan yang dicoba ulang setelah gangguan koneksi harus mencegah pencatatan ganda dan mengembalikan hasil yang sudah tersimpan jika permintaannya sama. Perubahan atau koreksi transaksi yang sudah selesai wajib memiliki alasan dan riwayat perubahan.
-15. Backup dan Pemulihan
-Sistem menyediakan backup otomatis harian dan backup manual yang dapat dijalankan saat diperlukan oleh Admin Utama.
-Backup disimpan selama 30 hari.
-Backup dienkripsi menggunakan age. Salinan backup disimpan di lokasi penyimpanan terpisah dari server utama; nama penyedia atau layanan penyimpanan belum ditetapkan.
-Kunci pembuka backup disimpan terpisah secara aman oleh pemilik toko, bukan di repositori dan bukan bersama file backup. Prosedur pengamanan kunci dan pemulihan harus didokumentasikan.
-Backup harus disimpan terpisah dari database utama dan diamankan. Backup mencakup database serta file penting seperti foto buku, gambar QRIS, dan bukti pembayaran.
-Proses pemulihan harus diuji sebelum operasional dan secara berkala agar backup benar-benar dapat digunakan ketika terjadi kehilangan atau kerusakan data.
-16. Tampilan dan Pengalaman Pengguna
-Seluruh antarmuka menggunakan Bahasa Indonesia.
-Gaya visual hangat dan klasik dengan warna krem dan cokelat, memberi kesan toko buku yang nyaman.
-Website harus responsif dan dapat digunakan melalui browser HP, tablet, dan komputer.
-Tidak ada aplikasi Android terpisah pada MVP.
-Beranda memuat pengenalan singkat Akira Books, buku terbaru, dan akses yang jelas ke katalog.
-Prioritas MVP adalah website yang aman, konsisten, dan dapat digunakan untuk mengelola kegiatan toko sebelum menambahkan integrasi eksternal yang lebih kompleks.
-Halaman checkout menampilkan pemberitahuan dan memblokir checkout ketika toko diketahui tutup. Jika status toko tidak dapat dipastikan, checkout tetap diblokir sementara dengan pesan yang sesuai.
-17. Status Toko dan Toko Libur
-Toko Libur berarti pemesanan online dihentikan, bukan operasional fisik toko. Admin tetap dapat berjualan di booth seperti biasa.
-17.1 Status dan Operasional Toko
-Status toko diubah secara manual oleh admin utama. Tidak ada penutupan atau pembukaan otomatis berdasarkan jadwal.
-Status toko disimpan di server dan berlaku sama di seluruh perangkat dan browser.
-Status toko disegarkan secara berkala melalui polling setiap 5 detik pada halaman yang memerlukan status toko terkini. Mekanisme streaming seperti SSE atau WebSocket tidak dipakai karena perubahan status toko relatif jarang. Interval polling dan pilihan transport ini merupakan rekomendasi teknis, bukan aturan bisnis.
-Polling dijeda ketika tab browser tidak aktif dan dilanjutkan kembali ketika tab aktif. Polling tidak diulang selama tab tidak aktif.
-Polling diterapkan pada halaman toko, katalog pelanggan, dan checkout pelanggan. Polling tidak diperlukan pada halaman login pelanggan maupun halaman akun yang tidak memerlukan status toko secara langsung.
-Ketika toko tutup, pelanggan tetap dapat mendaftar, masuk, mengelola akun, melihat katalog, dan mengisi keranjang.
-Pelanggan tidak dapat membuat pesanan online ketika toko tutup.
-Keranjang tidak mengunci stok dan tidak dihapus otomatis saat toko tutup.
-Status toko, ketersediaan buku, stok, dan harga diperiksa kembali di server saat pelanggan mengirim pesanan.
-Jika toko tutup atau buku tidak tersedia saat pengiriman pesanan, pesanan ditolak dengan pemberitahuan yang sesuai dan keranjang dipertahankan.
-Jika status toko tidak dapat dipastikan, checkout diblokir sementara sampai status terkonfirmasi.
-Jika admin utama menutup toko saat pelanggan sedang membuka checkout, server tetap menolak pembuatan pesanan.
-Perubahan katalog, harga, dan stok langsung terlihat oleh pelanggan, termasuk saat toko tutup.
-Admin tetap boleh mengelola katalog dan mencatat penjualan offline ketika toko tutup.
-Penjualan offline yang mengurangi stok harus menghapus buku yang terjual dari keranjang pelanggan yang terdampak dan pelanggan diberi tahu. Jika keranjang masih berisi buku lain, pelanggan wajib memeriksa dan menyetujui kembali keranjang sebelum melanjutkan pesanan. Ketersediaan buku lain tetap diperiksa kembali saat checkout.
-Pesanan online yang sudah aktif tetap berjalan sesuai aturan sebelumnya. Tenggat pembayaran dan jadwal pengambilan tidak otomatis dihentikan atau diubah karena toko tutup.
-Admin utama dapat membuka toko kapan saja tanpa pemeriksaan kesiapan katalog.
-Tidak ada notifikasi khusus kepada pelanggan saat toko ditutup maupun dibuka. Banner dan status checkout sudah menjadi pemberitahuan.
-Pelanggan tidak melihat perkiraan tanggal pembukaan kembali.
-17.2 Banner dan Antarmuka
-Ketika toko tutup, banner status beserta alasan ditampilkan di halaman toko dan katalog serta halaman pelanggan yang relevan.
-Banner Toko Libur tidak ditampilkan pada halaman login pelanggan.
-Ketika toko dibuka, banner menghilang otomatis tanpa perlu memuat ulang halaman.
-Status banner dan checkout diperbarui otomatis ketika status toko berubah.
-Jika koneksi pulih, aplikasi mengambil status terbaru dari server lalu memperbarui status dan antarmuka berdasarkan data terbaru tersebut.
-Jika status tidak bisa dipastikan, checkout tetap diblokir sementara dan menampilkan pesan yang sesuai.
-Jika pemeriksaan status toko gagal, tampilan mempertahankan status terakhir yang berhasil diterima disertai indikator jelas bahwa status tersebut belum terverifikasi.
-Jika sebelumnya ada banner Toko Libur, banner dan alasan terakhir yang diketahui tetap dipertahankan disertai indikator bahwa informasinya belum terverifikasi.
-Checkout tetap diblokir sementara sampai status toko berhasil dikonfirmasi kembali, dan pemeriksaan ulang dilakukan secara berkala.
-Kegagalan jaringan tidak boleh diperlakukan sebagai bukti bahwa toko otomatis terbuka atau tertutup.
-Kegagalan polling tidak boleh menghapus keranjang pelanggan.
-Dashboard admin utama menampilkan status toko secara jelas serta tombol Tutup Toko atau Buka Toko sesuai status saat ini.
-Dashboard admin biasa menampilkan status toko, tetapi tidak menyediakan kontrol untuk mengubahnya.
-Tombol Tutup Toko dinonaktifkan ketika toko sudah tutup. Admin utama dapat mengubah alasan yang aktif sebagai gantinya.
-Waktu pembaruan status terakhir tidak perlu ditampilkan kepada pelanggan.
-17.3 Hak Akses dan Konfirmasi
-Hanya admin utama yang dapat menutup toko, membuka toko, mengubah alasan penutupan, dan menghapus riwayat Toko Libur yang lama atau tidak aktif. Riwayat penutupan yang masih aktif tidak boleh dihapus.
-Admin utama dan admin biasa dapat melihat seluruh riwayat penutupan.
-Pelanggan hanya melihat status dan alasan penutupan yang sedang berlaku, bukan riwayat historis.
-Perubahan status memerlukan konfirmasi. Menutup dan membuka toko tidak termasuk tindakan yang wajib memakai verifikasi ulang kata sandi atau OTP.
-Server memvalidasi sesi, peran, dan status terkini saat tindakan dikirim.
-Jika sesi admin utama kedaluwarsa atau tidak valid, tindakan ditolak dan admin harus masuk kembali lalu mengulangi tindakan. Perubahan yang belum disimpan dibuang.
-Jika status berubah sebelum formulir dikirim, formulir lama ditolak dan admin diminta memuat ulang status terkini.
-Jika tindakan gagal, status dan banner tidak boleh dianggap berubah. Sistem menampilkan pesan kegagalan dan menyediakan percobaan ulang yang aman.
-Tindakan yang diulang tidak boleh menciptakan perubahan status atau catatan riwayat duplikat.
-17.4 Alasan Penutupan
-Alasan wajib diisi ketika menutup toko dan panjang maksimalnya 200 karakter.
-Hanya ada satu kolom alasan yang ditampilkan kepada pelanggan dan admin. Jangan memasukkan informasi internal atau rahasia ke dalam alasan.
-Tidak ada daftar alasan preset. Admin utama mengetik alasan secara manual.
-Validasi alasan hanya memastikan kolom tidak kosong dan maksimal 200 karakter.
-Alasan dapat diubah berulang kali selama toko masih tutup.
-Perubahan alasan harus melalui pratinjau dan konfirmasi sebelum dipublikasikan.
-Jika konfirmasi dibatalkan, perubahan yang belum disimpan dibuang dan alasan lama tetap berlaku.
-Jika penyimpanan gagal, alasan lama tetap tampil dan sistem menampilkan pesan kegagalan.
-Riwayat menyimpan alasan terakhir yang berlaku pada periode penutupan tersebut. Versi alasan sebelumnya tidak disimpan.
-Saat toko dibuka, alasan aktif dibersihkan, tetapi alasan terakhir tetap tersimpan dalam riwayat penutupan.
-Membuka toko tidak memerlukan alasan. Sistem mencatat waktu pembukaan dan pelakunya.
-17.5 Riwayat Penutupan
-Riwayat mencatat waktu penutupan, waktu pembukaan jika ada, nama dan peran pelaku, serta alasan terakhir. Riwayat tetap tersedia setelah toko dibuka kembali.
-Nama dan peran pelaku dipertahankan sebagaimana tercatat saat tindakan dilakukan, walaupun akun kemudian diganti nama, dinonaktifkan, atau dihapus.
-Waktu ditampilkan dalam tanggal dan jam/menit sesuai zona waktu Asia/Jakarta (WIB), misalnya 18 Okt 2026, 08.35 WIB. Detik tidak perlu ditampilkan.
-Jika toko masih tutup, kolom waktu pembukaan menampilkan Masih tutup.
-Durasi dihitung otomatis. Penutupan yang masih berlangsung menampilkan durasi berjalan. Jika data waktu tidak valid, tampilkan Tidak tersedia.
-Format durasi ringkas, misalnya 2 hari 3 jam.
-Riwayat diurutkan dari yang terbaru ke yang terlama dengan pagination 20 catatan per halaman.
-Riwayat tidak menyediakan pencarian, filter, ekspor, unduhan, atau ringkasan jumlah total.
-Tidak ada kolom status terpisah. Status tercermin dari kolom waktu pembukaan.
-Alasan ditampilkan langsung pada setiap baris riwayat. Alasan panjang dipotong dengan tanda … di daftar, tetapi isi aslinya tidak diubah.
-Admin dapat mengeklik atau mengetuk teks alasan untuk memperluasnya secara inline pada baris yang sama. Klik kembali untuk diciutkan.
-Beberapa alasan boleh diperluas sekaligus pada halaman yang sama. Saat berpindah halaman, semua alasan kembali diciutkan.
-Jika riwayat kosong, admin utama dan admin biasa tetap dapat membuka halaman riwayat. Tampilkan pesan Belum ada riwayat Toko Libur. disertai penjelasan bahwa riwayat baru muncul setelah toko berhasil ditutup atau dibuka kembali.
-Tombol Hapus Semua Riwayat dinonaktifkan ketika daftar kosong.
-Ketika riwayat dihapus, daftar diperbarui otomatis tanpa memuat ulang halaman dan alasan yang sedang diperluas ikut hilang.
-Penghapusan riwayat tidak mengubah status toko maupun banner pelanggan.
-17.6 Penghapusan Riwayat
-Hanya Admin Utama yang boleh menghapus riwayat Toko Libur yang lama atau sudah tidak aktif, baik satu catatan maupun seluruh riwayat. Riwayat penutupan toko yang masih aktif tidak boleh dihapus.
-Penghapusan tidak memerlukan alasan wajib. Penghapusan memerlukan konfirmasi biasa; tidak perlu kata konfirmasi khusus meskipun jumlah riwayat banyak.
-Penghapusan bersifat permanen tanpa tempat sampah atau pemulihan. Setiap penghapusan wajib dicatat dalam audit administratif terpisah; audit tersebut tidak ikut terhapus.
-Jika penghapusan seluruh riwayat gagal, seluruh penghapusan dibatalkan sehingga tidak ada catatan yang terhapus sebagian.
-Jika berhasil, tampilkan pesan sukses singkat dan perbarui daftar menjadi kosong.
-Jika gagal, riwayat tetap utuh dan admin menerima pesan kegagalan.
-Penghapusan riwayat tidak mengubah status toko maupun banner yang sedang ditampilkan.
-Perangkat lain harus memperbarui riwayat secara otomatis tanpa memuat ulang halaman.
-Jika perangkat sedang luring, setelah koneksi pulih perangkat mengambil ulang riwayat terbaru dari server. Riwayat yang sudah dihapus tidak boleh muncul kembali dari data lokal.
-Sinkronisasi yang belum berhasil dapat ditandai dan dicoba kembali secara otomatis. Server tetap menjadi sumber kebenaran.
-17.7 Konsistensi dan Gagal Teknis
-Perubahan status toko dan pembuatan catatan riwayat dilakukan secara atomik. Jika salah satunya gagal, tindakan tidak dianggap berhasil.
-Penutupan atau pembukaan yang berulang maupun bersamaan tidak boleh membuat status yang tidak konsisten atau riwayat duplikat.
-Penghapusan massal riwayat dilakukan secara atomik.
-Setelah koneksi pulih, status toko dan riwayat disegarkan dari server.
-Jika sinkronisasi gagal, dilakukan percobaan ulang yang aman tanpa menciptakan duplikat.
-Semua pemeriksaan otorisasi dan status penting dilakukan di server, bukan hanya di antarmuka.
-18. Prinsip Implementasi
-Dokumen kebutuhan dan aturan bisnis menjadi acuan implementasi.
-OpenCode harus membaca dan menganalisis dokumen sebelum membuat kode.
-Sebelum implementasi, OpenCode wajib membaca AGENTS.md dan dokumentasi Next.js lokal di node_modules/next/dist/docs/ sesuai versi yang terpasang.
-Rekomendasi teknis tidak boleh diperlakukan sebagai keputusan bisnis baru tanpa persetujuan.
-Rancangan arsitektur, database, dan alur teknis harus ditinjau sebelum implementasi fitur.
-Fitur dikembangkan bertahap dan diuji setelah setiap tahap.
-Perubahan kebutuhan harus dicatat dalam dokumentasi.
-Keamanan dan konsistensi transaksi harus ditegakkan di server dan database, bukan hanya di antarmuka.
-Setiap checkpoint GitHub menjadi titik untuk menyimpan pekerjaan dan meninjau kembali perubahan sebelum melanjutkan.
-Semua tanggal, tenggat, dan jadwal menggunakan zona waktu Asia/Jakarta (WIB).
-19. Catatan Teknis (Rekomendasi, Bukan Keputusan Bisnis)
-Bagian ini berisi usulan teknis untuk mendukung aturan bisnis. Usulan ini bukan keputusan bisnis baru dan perlu disetujui sebelum implementasi.
-Pembuatan pesanan dan perubahan stok harus aman terhadap permintaan bersamaan. Rekomendasi: gunakan transaksi database, pembaruan stok bersyarat, penguncian baris yang sesuai, dan batasan unik untuk mencegah satu eksemplar ditahan oleh dua pesanan aktif. Isolation level dan mekanisme retry ditentukan pada rancangan teknis.
-Operasi yang dapat terkirim berulang harus memiliki strategi idempotensi. Rekomendasi: kunci idempotensi unik per operasi, penyimpanan hasil, dan penolakan kunci yang sama dengan muatan berbeda. Operasi penting meliputi pembuatan pesanan, persetujuan pembayaran, unggah bukti, pembatalan, keputusan jadwal, dan tindakan admin penting.
-Pengingat 2 jam harus memakai jadwal persisten di database, bukan hanya setInterval. Rekomendasi: tabel pekerjaan/outbox dengan waktu jalan berikutnya, status, percobaan, dan kunci unik per slot pengingat; worker mengambil pekerjaan dengan penguncian yang aman, melakukan retry dengan jeda, dan melanjutkan pekerjaan yang tertunda setelah server restart.
-Waktu disimpan secara konsisten di server dan ditampilkan kepada pengguna dalam zona waktu Asia/Jakarta. Perbandingan tenggat menggunakan waktu server, bukan waktu perangkat pengguna.
-Snapshot harga, kondisi, tenggat, dan data pesanan harus tetap konsisten dengan keadaan saat pesanan dibuat. Snapshot tidak boleh ditimpa oleh perubahan katalog atau perubahan pengaturan global.
-Audit administratif dirancang append-only. Aplikasi tidak menyediakan fungsi mengubah atau menghapus catatan yang sudah tercatat; pembatasan juga perlu ditegakkan pada hak akses database. Hanya Admin Utama yang dapat membaca audit.
-Otorisasi harus ditegakkan di server, bukan hanya dengan menyembunyikan elemen antarmuka. Data modal dan keuntungan tidak boleh disertakan dalam respons untuk Admin biasa.
-Penghapusan massal riwayat Toko Libur harus dilakukan dalam satu transaksi atomik dan menulis audit administratif terpisah dalam transaksi yang sama atau mekanisme yang menjamin keduanya konsisten.
-Kontrak API perlu mencakup validasi input, kode error yang konsisten, pagination untuk daftar besar, batas ukuran halaman, dan pemeriksaan hak akses. Bentuk kontrak ditentukan pada rancangan teknis.
-Backup dan restore harus mencakup database serta file penting, diuji secara berkala, dan tidak menyimpan kunci pembuka bersama file backup.
-
-
-
-AKIRA BOOKS — REQUIREMENTS
-1. Tujuan Proyek
-Akira Books adalah website untuk membantu pengelolaan toko buku bacaan original dan bekas, mulai dari katalog, pesanan, pembayaran, jadwal pengambilan, hingga pencatatan transaksi.
 Website mendukung kegiatan penjualan langsung di booth CFD yang beroperasi setiap Minggu pagi dan berakhir tepat pukul 09.00.
 Website bukan marketplace. Pengelolaan toko dilakukan oleh admin, sedangkan pelanggan dapat melihat katalog dan melakukan pemesanan melalui website.
 Akira Books dikembangkan untuk:
 Menyediakan katalog buku yang dapat diakses secara online.
 Mempermudah pelanggan memesan buku dan mengunggah bukti pembayaran.
 Membantu admin mengelola buku, pesanan, jadwal pengambilan, dan transaksi.
-Mencatat modal serta menghitung laba kotor per buku.
+Mencatat modal serta menghitung laba kotor per unit buku.
 Menyediakan laporan penjualan yang hanya dapat diakses Admin Utama.
 Menyimpan riwayat aktivitas penting agar perubahan data dapat ditelusuri.
 Mengurangi risiko kehilangan data melalui backup otomatis dan manual.
@@ -545,22 +166,13 @@ Penerbit.
 Tahun terbit.
 Satu atau lebih kategori.
 Foto buku.
-Kondisi buku.
 Deskripsi.
 Harga jual.
-Modal per eksemplar.
-Status ketersediaan.
+Modal per unit buku.
+Jumlah stok total (kuantitas numerik integer >= 0). 
 Riwayat perubahan data.
 Buku yang memiliki judul, penulis, penerbit, dan tahun terbit sama tetap dapat memiliki kondisi, foto, harga jual, serta modal yang berbeda.
-5.2 Kondisi Buku
-Pilihan kondisi standar:
-Baru.
-Sangat Baik.
-Baik.
-Cukup.
-Admin dapat menambahkan deskripsi kerusakan, kekurangan, atau kelebihan buku. Deskripsi tambahan bersifat opsional.
-Harga jual ditentukan untuk setiap buku fisik. Perbedaan kondisi dapat menghasilkan perbedaan harga.
-5.3 Modal Buku
+5.2 Modal Buku
 Modal disimpan per eksemplar, bukan per judul.
 Hanya Admin Utama yang boleh mengatur atau mengoreksi modal.
 Setiap koreksi modal wajib memiliki alasan dan mencatat:
@@ -572,7 +184,7 @@ Waktu koreksi.
 Setelah koreksi, sistem menghitung ulang laba berdasarkan modal terbaru.
 Laba historis dari penjualan yang sudah selesai tidak berubah. Admin Utama dapat melihat laba historis dan hasil perhitungan ulang menggunakan modal terbaru secara terpisah.
 Admin Biasa tidak boleh melihat modal atau mengubahnya melalui antarmuka maupun akses server.
-5.4 Stok
+5.3 Stok
 Setiap buku fisik merupakan satu data dengan stok tersedia 0 atau 1.
 Status buku harus membedakan antara:
 Tersedia.
@@ -581,7 +193,7 @@ Terjual.
 Nonaktif.
 Buku yang sedang dipesan tetap dapat terlihat di katalog, tetapi tidak dapat dipesan Customer lain.
 Buku yang terjual atau dinonaktifkan tidak tampil sebagai buku tersedia. Riwayat buku tetap dipertahankan sesuai aturan penyimpanan data.
-5.5 Perubahan dan Penghapusan Buku
+5.4 Perubahan dan Penghapusan Buku
 Admin dapat menambahkan satu atau beberapa buku, mengubah data, mengganti foto, mengatur kategori, dan mengelola status buku sesuai hak akses.
 Jika buku belum memiliki riwayat pesanan atau transaksi, penghapusan permanen dapat dilakukan sesuai aturan sistem.
 Jika buku sudah memiliki riwayat, buku dinonaktifkan daripada dihapus permanen agar riwayat transaksi tetap dapat ditelusuri.
@@ -606,7 +218,6 @@ Status ketersediaan.
 Pencarian dan filter mencakup:
 Judul atau penulis.
 Kategori.
-Kondisi.
 Rentang harga.
 Buku yang sedang dipesan dapat ditampilkan dengan status yang jelas, tetapi tidak bisa ditambahkan ke pesanan baru.
 Buku terjual dan buku yang dinonaktifkan tidak ditampilkan sebagai buku tersedia.
@@ -881,7 +492,7 @@ Penjualan harian.
 Penjualan bulanan.
 Penjualan tahunan.
 Total pembayaran yang telah diverifikasi.
-Jumlah buku terjual.
+Jumlah unit buku terjual.
 Riwayat transaksi.
 Laba kotor dari penjualan yang sudah selesai.
 Pemisahan penjualan online dan offline.

@@ -8,7 +8,7 @@ Akira Books dikembangkan untuk:
 Menyediakan katalog buku yang bisa diakses secara online.
 Mempermudah pelanggan memesan buku dan mengunggah bukti pembayaran.
 Membantu admin mengelola buku, pesanan, jadwal pengambilan, dan transaksi.
-Mencatat modal serta menghitung laba kotor per buku.
+Mencatat modal serta menghitung laba kotor per unit buku.
 Menyediakan laporan penjualan yang hanya dapat diakses admin utama.
 Menyimpan riwayat aktivitas penting agar perubahan data dapat ditelusuri.
 Mengurangi risiko kehilangan data melalui backup otomatis dan manual.
@@ -71,7 +71,7 @@ Melakukan pembatalan pesanan berbayar tanpa persetujuan admin utama.
 3.4 Admin utama
 Admin utama memiliki hak akses operasional dan hak akses khusus, yaitu:
 Melihat laporan penjualan dan laporan keuangan.
-Melihat dan mengoreksi modal setiap buku fisik.
+Melihat dan mengoreksi modal setiap buku.
 Mengelola akun admin dan menetapkan perannya.
 Mengatur backup database.
 Mengelola pengaturan toko dan QRIS.
@@ -112,8 +112,8 @@ Customer dapat meminta tautan pemulihan melalui email terdaftar. Tautan memiliki
 4.5 Penonaktifan customer
 Admin dapat memberikan peringatan, menonaktifkan sementara, atau menonaktifkan permanen akun customer. Tindakan memerlukan alasan dan riwayat.
 Akun yang dinonaktifkan tidak dapat login atau membuat pesanan baru. Pesanan yang sudah ada tetap diproses sesuai statusnya.
-Penonaktifan sementara memiliki tanggal berakhir. Setelah waktunya habis, akun kembali aktif kecuali admin mengubah keputusan sesuai prosedur.
-Customer harus dapat melihat alasan penonaktifan serta tanggal aktivasi kembali jika bersifat sementara.
+Penonaktifan sementara tidak memiliki aktivasi otomatis berdasarkan tanggal atau waktu. Akun tetap nonaktif sampai Admin mengaktifkannya kembali secara manual.
+Customer harus dapat melihat alasan penonaktifan akun.
 4.6 Penghapusan akun customer
 Customer dapat mengajukan penghapusan akun. Jika masih ada pesanan aktif, penghapusan ditunda sampai seluruh pesanan selesai atau dibatalkan.
 Sebelum penghapusan benar-benar dilakukan, customer dapat membatalkan permintaannya. Sistem mencatat riwayat permintaan dan pembatalannya.
@@ -121,7 +121,6 @@ Penghapusan permanen tidak dapat dibatalkan setelah selesai.
 Data transaksi yang wajib dipertahankan untuk kebutuhan operasional, keamanan, atau kewajiban hukum harus diperlakukan sesuai kebijakan retensi. Permintaan penghapusan akun tidak boleh menghapus riwayat transaksi secara sembarangan.
 5. Pengelolaan Buku
 5.1 Data buku
-Setiap buku fisik memiliki data tersendiri, termasuk ketika ada beberapa eksemplar dengan judul yang sama.
 Data buku meliputi:
 Identitas buku atau kode unik.
 Judul.
@@ -130,23 +129,13 @@ Penerbit.
 Tahun terbit.
 Satu atau lebih kategori.
 Foto buku.
-Kondisi buku.
 Deskripsi.
 Harga jual.
-Modal per eksemplar.
-Status ketersediaan.
+Modal per unit buku.
+Jumlah stok total (kuantitas numerik integer >= 0).
 Riwayat perubahan data.
-Buku yang memiliki judul, penulis, penerbit, dan tahun terbit sama tetap dapat memiliki kondisi, foto, harga jual, serta modal yang berbeda.
-5.2 Kondisi buku
-Pilihan kondisi standar:
-Baru.
-Sangat Baik.
-Baik.
-Cukup.
-Admin dapat menambahkan deskripsi kerusakan, kekurangan, atau kelebihan buku. Deskripsi tambahan bersifat opsional.
-Harga jual ditentukan untuk setiap buku fisik. Perbedaan kondisi dapat menghasilkan perbedaan harga.
-5.3 Modal buku
-Modal disimpan per eksemplar, bukan per judul.
+5.2 Modal buku
+Modal disimpan per unit buku berbasis kuantitas per judul.
 Hanya admin utama yang boleh mengatur atau mengoreksi modal.
 Setiap koreksi modal wajib memiliki alasan dan mencatat:
 Modal sebelumnya.
@@ -156,8 +145,8 @@ Admin utama yang melakukan koreksi.
 Waktu koreksi.
 Setelah koreksi, sistem menghitung ulang laba berdasarkan modal terbaru.
 Admin biasa tidak boleh melihat modal atau mengubahnya melalui antarmuka maupun akses server.
-5.4 Stok
-Setiap buku fisik merupakan satu data dengan stok tersedia 0 atau 1.
+5.3 Stok
+Stok dihitung sebagai kuantitas total numerik (integer >= 0) untuk setiap data judul buku gabungan tanpa memisahkan rincian kondisi fisik per item.
 Status buku harus membedakan antara:
 Tersedia.
 Sedang dipesan atau ditahan.
@@ -165,11 +154,11 @@ Terjual.
 Dinonaktifkan.
 Buku yang sedang dipesan tetap dapat terlihat di katalog, tetapi tidak dapat dipesan customer lain.
 Buku yang terjual atau dinonaktifkan tidak tampil sebagai buku tersedia. Riwayat buku tetap dipertahankan sesuai aturan penyimpanan data.
-5.5 Perubahan dan penghapusan buku
+5.4 Perubahan dan penghapusan buku
 Admin dapat menambahkan satu atau beberapa buku, mengubah data, mengganti foto, mengatur kategori, dan mengelola status buku.
 Jika buku belum memiliki riwayat pesanan atau transaksi, penghapusan permanen dapat dilakukan sesuai aturan sistem.
 Jika buku sudah memiliki riwayat, buku dinonaktifkan daripada dihapus permanen agar riwayat transaksi tetap dapat ditelusuri.
-Perubahan harga atau kondisi yang memengaruhi kesepakatan pesanan dibatasi ketika buku memiliki pesanan aktif. Foto dan deskripsi dapat diperbarui sesuai aturan, tetapi data historis dalam pesanan harus tetap sama.
+Perubahan harga yang mempengaruhi kesepakatan pesanan dibatasi ketika buku memiliki pesanan aktif. Foto dan deskripsi dapat diperbarui sesuai aturan, tetapi data historis dalam pesanan harus tetap sama.
 Buku dengan riwayat duplikat dapat digabungkan melalui proses yang menjaga identitas serta keterlacakan transaksi lama.
 6. Katalog dan Beranda
 6.1 Beranda
@@ -188,26 +177,23 @@ Status ketersediaan.
 Pencarian dan filter mencakup:
 Judul atau penulis.
 Kategori.
-Kondisi.
 Rentang harga.
 Buku yang sedang dipesan dapat ditampilkan dengan status yang jelas, tetapi tidak bisa ditambahkan ke pesanan baru. Buku terjual dan buku yang dinonaktifkan tidak ditampilkan sebagai buku tersedia.
 6.3 Detail buku
-Halaman detail menampilkan informasi lebih lengkap, termasuk penerbit, tahun terbit, kondisi, harga, deskripsi, kategori, foto, dan status ketersediaan.
+Halaman detail menampilkan informasi lebih lengkap, termasuk penerbit, tahun terbit, harga jual, deskripsi, kategori, foto, serta status ketersediaan dan jumlah stok. 
 6.4 Informasi toko
 Halaman informasi toko menampilkan informasi Akira Books dan QRIS sesuai aturan akses serta status pesanan.
 7. Keranjang dan Pemesanan
 7.1 Keranjang
-Customer yang sudah login dapat memilih beberapa buku untuk satu pesanan.
-Keranjang tidak menahan stok. Stok baru ditahan ketika customer menekan tombol “Buat Pesanan”.
+Customer yang sudah login dapat memilih beberapa buku beserta jumlah kuantitasnya untuk satu pesanan. Keranjang tidak menahan stok. Stok baru ditahan ketika customer menekan tombol “Buat Pesanan”. 
 7.2 Pembuatan pesanan
-Ketika pesanan dibuat, server memeriksa kembali ketersediaan seluruh buku secara aman.
-Jika satu atau beberapa buku tidak lagi tersedia, sistem tidak boleh membuat pesanan yang menyebabkan stok ganda. Customer diberi tahu buku mana yang tidak tersedia.
+Ketika pesanan dibuat, server memeriksa kembali ketersediaan stok seluruh buku secara aman menggunakan penguncian baris (row-level locking) pada tingkat database untuk mencegah kendala kondisi pacuan (race condition).
+Jika kuantitas stok satu atau beberapa buku tidak mencukupi, sistem tidak boleh membuat pesanan yang menyebabkan stok ganda atau minus. Customer diberi tahu buku mana yang stoknya tidak mencukupi.
 Jika berhasil:
 Pesanan dibuat.
-Buku yang dipesan ditahan.
-Data buku, harga, dan kondisi saat pemesanan disimpan sebagai snapshot.
+Kuantitas stok buku yang dipesan ditahan. 
+Data buku, kuantitas, dan harga saat pemesanan disimpan sebagai snapshot. 
 Status pesanan menjadi “Menunggu Pembayaran”.
-Status jadwal menjadi “Menunggu Konfirmasi”.
 Tenggat pembayaran ditentukan berdasarkan pengaturan yang berlaku saat pesanan dibuat.
 Customer menerima notifikasi website.
 Snapshot menjaga agar perubahan katalog setelah pesanan dibuat tidak mengubah kesepakatan historis.
@@ -235,11 +221,11 @@ Customer boleh mengganti bukti ketika statusnya masih “Menunggu Verifikasi”.
 8.3 Verifikasi dua tahap
 Semua admin dapat memeriksa bukti pembayaran dan mengajukan hasil pemeriksaan.
 Namun, pesanan baru menjadi “Sudah Dibayar” setelah admin utama menyetujui hasil tersebut.
-Admin utama yang menyetujui harus berbeda dari admin yang memeriksa bukti pada tahap awal.
-Jika tidak ada admin utama lain yang dapat menyetujui, pesanan tetap menunggu keputusan. Sistem tidak boleh menyetujui pembayaran secara otomatis.
+Sistem hanya memiliki satu Admin Utama. Jika admin utama belum menyetujui, pesanan tetap menunggu keputusan. Sistem tidak boleh menyetujui pembayaran secara otomatis.
+Jika admin utama belum menyetujui, pesanan tetap menunggu keputusan dari admin utama.
 Jika admin utama menolak hasil pemeriksaan pertama, alasan wajib diisi. Kasus dikembalikan kepada admin pemeriksa yang sama untuk diperiksa ulang.
 Jika pemeriksaan ulang kembali ditolak, admin utama mengambil alih kasus dan dapat meminta bukti baru. Alasan dan tenggat baru wajib ditetapkan.
-Jika hanya ada satu admin utama, mekanisme persetujuan tidak boleh dilewati diam-diam. Kasus tersebut harus tetap menunggu admin yang berbeda atau ditangani melalui prosedur pengecualian yang ditetapkan secara eksplisit sebelum implementasi.
+Mekanisme persetujuan admin utama tidak boleh dilewati. Kasus tersebut harus tetap menunggu keputusan dari admin utama.
 8.4 Bukti baru
 Jika bukti tidak valid, admin dapat meminta bukti baru dengan alasan dan tenggat baru.
 Status bukti menjadi “Perlu Bukti Baru”, sedangkan status pesanan tetap “Menunggu Pembayaran”.
@@ -259,7 +245,7 @@ Jika bukti baru diminta dan tenggat penggantinya terlewati tanpa bukti baru, pes
 Semua pengunggahan dan perubahan status harus menggunakan waktu yang tercatat di server. Proses bersamaan antara unggah bukti dan pembatalan harus ditangani secara atomik agar stok tidak dikembalikan dua kali atau status menjadi bertentangan.
 9.2 Pengingat dan eskalasi
 Jika bukti telah diunggah tetapi belum diperiksa saat tenggat terlewati, sistem mengirim pengingat setiap dua jam kepada admin yang harus bertindak.
-Jika persetujuan pembayaran belum diputuskan, sistem juga mengirim pengingat setiap dua jam. Setelah 24 jam tanpa keputusan, kasus dieskalasikan kepada admin utama lain jika tersedia.
+Jika persetujuan pembayaran belum diputuskan, sistem juga mengirim pengingat setiap dua jam kepada admin utama. Tidak ada mekanisme eskalasi ke admin utama lain karena sistem hanya memiliki satu Admin Utama.
 Pengingat dan eskalasi berhenti segera setelah keputusan terkait dibuat.
 Tidak ada persetujuan pembayaran otomatis hanya karena admin belum merespons.
 10. Jadwal Pengambilan
@@ -306,23 +292,23 @@ Admin yang mengusulkan pembatalan pesanan berbayar tidak boleh menjadi admin uta
 Jika hanya ada satu admin utama dan orang tersebut mengusulkan pembatalan, pengecualian dapat dilakukan dengan alasan tambahan yang wajib dicatat.
 Pesanan yang dibatalkan tetap tersimpan dalam riwayat customer dan laporan terkait.
 12. Penyelesaian Pesanan
-Pesanan hanya boleh ditandai “Selesai” setelah buku benar-benar diserahkan kepada customer.
+Pesanan hanya boleh ditandai “Selesai” setelah buku benar-benar diserahkan kepada customer dan kuantitas stok yang ditahan disesuaikan atau dicatat secara permanen sebagai terjual.
 Admin menekan tombol “Selesai” setelah penyerahan fisik dilakukan.
 Status selesai tidak boleh terjadi hanya karena pembayaran telah diverifikasi atau tanggal pengambilan telah tiba.
 Jika status perlu dikoreksi, admin harus mengikuti aturan koreksi status, memberikan alasan, dan mempertahankan riwayat status sebelumnya. Koreksi status selesai hanya boleh mengembalikan pesanan ke status sebelumnya yang tercatat, bukan mengubah status ke sembarang nilai.
 Perbaikan data nonstatus dapat dilakukan sesuai hak akses dan harus dicatat bila memengaruhi transaksi.
 13. Penjualan Offline
 Buku yang terjual langsung di lapak tanpa pesanan online harus dapat dicatat melalui fitur penjualan offline.
-Admin memilih buku fisik yang dijual dan memasukkan harga transaksi aktual. Harga aktual boleh berbeda dari harga katalog.
+Admin memilih judul buku yang dijual, menentukan kuantitas unit, dan memasukkan harga transaksi aktual. Harga aktual boleh berbeda dari harga katalog.
 Sistem mencatat:
-Buku yang terjual.
+Judul buku dan kuantitas unit yang terjual.
 Harga jual aktual.
-Modal per buku.
+Modal per unit buku.
 Laba kotor.
 Waktu transaksi.
 Admin yang mencatat.
 Jenis transaksi “Offline”.
-Setelah penjualan berhasil dicatat, buku tidak lagi tampil sebagai buku tersedia.
+Setelah penjualan berhasil dicatat, kuantitas stok buku langsung berkurang sesuai jumlah yang terjual (dan jika stok menjadi 0, tidak lagi tampil sebagai buku tersedia). 
 Penjualan offline tidak memerlukan unggahan bukti pembayaran melalui sistem. Namun, transaksi harus tetap masuk ke laporan penjualan dan riwayat.
 13.1 Koreksi harga jual offline
 Semua admin boleh mengajukan koreksi harga jual transaksi offline dengan alasan wajib.
@@ -338,18 +324,18 @@ Penjualan harian.
 Penjualan bulanan.
 Penjualan tahunan.
 Total pendapatan penjualan.
-Jumlah buku terjual.
+Jumlah unit buku terjual.
 Riwayat transaksi.
 Pembedaan transaksi online dan offline.
-Modal dan laba kotor sesuai data yang tercatat.
+Modal per unit dan laba kotor sesuai kuantitas penjualan yang tercatat.
 Laporan harus membedakan antara pembayaran yang telah diverifikasi dan penjualan yang benar-benar selesai.
 Pembayaran diverifikasi saat admin utama menyetujui bukti pembayaran. Penjualan selesai dicatat ketika buku diserahkan dan admin menekan “Selesai”.
 Jika pesanan berbayar dibatalkan, catatan pembayaran dan pembatalan tetap ada. Sistem tidak boleh menganggap pembatalan sebagai pengembalian dana tanpa pencatatan terpisah.
 Laporan menggunakan data transaksi dan snapshot yang sesuai agar perubahan katalog tidak mengubah histori penjualan secara keliru.
 Ekspor Excel dan laporan buku terlaris tidak termasuk MVP.
 14.1 Perhitungan laba kotor
-Laba kotor per buku dihitung sebagai:
-Laba kotor = Harga jual aktual − Modal buku
+Laba kotor per unit buku dihitung sebagai:
+Laba kotor = Harga jual aktual − Modal per unit buku 
 Contoh:
 Harga jual: Rp50.000.
 Modal: Rp30.000.
@@ -455,8 +441,8 @@ Termasuk MVP:
 Login dan pengelolaan akun.
 Hak akses pengunjung, customer, admin, dan admin utama.
 Katalog, pencarian, filter, serta detail buku.
-Pengelolaan buku fisik dan kategori.
-Modal per buku yang hanya dikelola admin utama.
+Pengelolaan data buku berbasis kuantitas stok total dan kategori.
+Modal per unit buku yang hanya dikelola admin utama.
 Keranjang dan pembuatan pesanan.
 QRIS dan unggah bukti pembayaran.
 Verifikasi pembayaran dua tahap.
@@ -498,7 +484,6 @@ Tahap 4 — Katalog dan pengelolaan buku
 CRUD buku.
 Kategori.
 Foto.
-Kondisi dan harga.
 Modal khusus admin utama.
 Status ketersediaan.
 Tahap 5 — Pesanan dan pembayaran
