@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +8,391 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ==========================================
+// 1. MASA & AKUN
+// ==========================================
+
+enum Role {
+  CUSTOMER
+  ADMIN_BIASA
+  ADMIN_UTAMA
+}
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  passwordHash  String
+  name          String?
+  whatsapp      String?
+  role          Role
+  isActive      Boolean     @default(true)
+  deactivationReason String?
+  deletionRequestedAt DateTime?
+
+  // FK fields (hanya sekali didefinisikan, tanpa @relation opposite validation)
+  sessionUserId String?     // FK ke Session
+  cartUserId    String?     // FK ke Cart
+  orderCustomerId String?  // FK ke Order pelanggan
+}
+
+// Session model - FK ke User via sessionUserId
+model Session {
+  id            String      @id @default(uuid())
+  userId        String      // FK ke User.id
+  tokenHash     String      @unique
+  expiresAt     DateTime
+
+  // FK ke User (didefinisikan di sini, bukan di model User)
+  userSessionId String? // Referensi ke userId Session
+}
+
+// OtpAndRecoveryToken model - FK ke User via userId
+model OtpAndRecoveryToken {
+  id            String      @id @default(uuid())
+  userId        String      // FK ke User.id
+  codeHash      String
+  type          String      // "OTP_SENSITIF" | "RESET_PASSWORD" | "RECOVERY_ADMIN"
+  failedAttempts Int         @default(0)
+  expiresAt     DateTime
+  usedAt        DateTime?
+
+  // FK ke User
+  userUserId String // FK ke User.id (akan digantikan oleh prisma relation saat migrate)
+}
+
+// ==========================================
+// 2. MASTER BUKU & KATALOG
+// ==========================================
+
+model Category {
+  id        String      @id @default(uuid())
+  name      String      @unique
+}
+
+model Book {
+  id                String      @id @default(uuid())
+  code              String      @unique
+  title               String
+  author             String
+  publisher          String
+  publishYear        Int
+  imageUrl           String?
+  description        String?
+  sellingPrice       Int
+  costPrice          Int        // Rahasia: Khusus Admin Utama (GR-03, BR-004)
+  stockTotal         Int         // Stok agregat >= 0 per judul (GR-08)
+  stockReserved      Int         // Stok ditahan order aktif (BR-010)
+  status             String      // "TERSEDIA" | "SEDANG_DIPESAN" | "TERJUAL" | "NONAKTIF"
+
+  // OD-02: Kolom penggabungan buku duplikat
+  mergedIntoBookId   String?     // Referensi ke buku utama jika ini adalah duplikat
+
+  // FK ke Category
+  categoryId       String
+}
+
+// BookCategory many-to-mana menggunakan @@unique
+model BookCategory {
+  bookId    String
+  categoryId String
+  @@unique([bookId, categoryId])
+}
+
+// Riwayat harga modal (Admin Utama saja)
+model BookCostHistory {
+  id            String      @id @default(uuid())
+  bookId        String
+  oldCostPrice  Int
+  newCostPrice  Int
+  reason        String
+  changedById   String      // Admin Utama ID
+  createdAt     DateTime    @default(now())
+}
+
+// ==========================================
+// 3. KERANJANG & PESANAN
+// ==========================================
+
+model Cart {
+  id            String      @id @default(uuid())
+  userId        String
+
+  // FK ke User
+  userUserId    String
+}
+
+model CartItem {
+  id            String      @id @default(uuid())
+  cartId        String
+  bookId        String
+  quantity      Int         // Kuantitas buku di keranjang
+
+  // FK ke Cart
+  cartCartId    String
+  // FK ke Book
+  bookBookId    String
+}
+
+// Model Order (status sesuai state machine BR-001 s.d. BR-026)
+model Order {
+  id                 String      @id @default(uuid())
+  orderNumber     String      @unique
+  idempotencyKey   String      @unique
+  customerId      String
+
+  // Status utama (Order Status Domain - BR-005, BR-001)
+  orderStatus      String      // "MENUNGGU_PEMBAYARAN" | "SUDAH_DIBAYAR" | "MENUNGGU_DIAMBIL" | "SELESAI" | "DIBATALKAN"
+
+  // Status bukti pembayaran (Payment Evidence Domain - BR-006)
+  paymentProofStatus PaymentProofStatus // "BELUM_DIUNGGAH" | "MENUNGGU_VERIFIKASI" | "PERLU_BUKTI_BARU" | "TERVERIFIKASI"
+
+  // Status jadwal pengambilan (Pickup Domain - BR-006)
+  pickupStatus       PickupStatus // "MENUNGGU_KONFIRMASI" | "DISETUJUI" | "PERLU_TANGGAL_BARU" | "PERUBAHAN_MENUNGGU_PERSETUJUAN"
+
+  // Status refund (Refund Domain - BR-020)
+  refundStatus       RefundStatus // "TIDAK_BERLAKU" | "PERLU_DIPROSES" | "DIKEMBALIKAN_SEBAGIAN" | "SELESAI"
+
+  paymentMethod      PaymentMethod // "QRIS" | "TUNAI_CFD"
+  pickupSundayDate   DateTime    // Tanggal Minggu di masa depan (BR-018, tutup 09.00)
+  pickupGroupId      String?     // Opsional: gabung jadwal dengan pesanan lain
+  paymentDeadline    DateTime    // Tenggat 24 jam sejak pembuatan (BR-009, BR-DUE-001)
+  pausedRemainingSeconds Int?     // Jeda hitung mundur saat ubah metode bayar (BR-016)
+  lockedByAdminId    String?     // Admin yang mengunci order (seperti BR-002)
+  lockExpiresAt      DateTime?   // Waktu kunce habis
+  allocatedAmount    Int?        // Alih-alih nominal total, tracking per-allocation (OD-03)
+
+  // FK ke User
+  customerUserId   String
+}
+
+// OrderItem: snapshot harga & kuantitas per buku di dalam order (BR-011)
+model OrderItem {
+  id            String      @id @default(uuid())
+  orderId       String
+  bookId        String
+  quantity      Int
+  snapshotTitle String      // Judul pada saat order dibuat (tidak berubah)
+  snapshotSellingPrice Int      // Harga jual pada saat order (BR-011 - snapshot tidak berubah)
+  snapshotCostPrice Int       // Cost price snapshot (Rahasia: Admin Utama, BR-004)
+
+  // FK ke Order
+  orderOrderId   String
+  // FK ke Book
+  bookBookId     String
+}
+
+// Riwayat status order (audit - BR-024 immutable)
+model OrderStatusHistory {
+  id            String      @id @default(uuid())
+  orderId       String
+  domain        String      // "ORDER" | "PAYMENT" | "PICKUP" | "REFUND"
+  oldStatus     String
+  newStatus     String
+  reason        String?
+  actorId       String
+  actorRole     String
+  createdAt     DateTime    @default(now())
+
+  // FK ke Order
+  orderOrderId   String
+}
+
+// ==========================================
+// 4. PEMBAYARAN QRIS & BUKTI
+// ==========================================
+
+model QrisConfig {
+  id            String      @id @default(uuid())
+  imageUrl      String
+  isActive      Boolean
+  uploadedById  String
+
+  // FK ke User
+  userUserId    String
+}
+
+// PaymentEvidence: bukti transfer yang diunggah customer (BR-014, BR-015)
+model PaymentEvidence {
+  id            String      @id @default(uuid())
+  imageUrl      String
+  status        String
+  rejectionCount Int        @default(0)
+  initialCheckedById String?
+  finalApprovedById String?
+  uploadedAt    DateTime    @default(now())
+
+  // FK ke User
+  userUserId    String
+}
+
+// OrderPaymentAllocation: relasi many-to-many antar Order dan PaymentEvidence (OD-03)
+// Satu bukti QRIS bisa dialokasikan ke banyak pesanan dengan nominal terpercaya
+model OrderPaymentAllocation {
+  id               String      @id @default(uuid())
+  orderId          String
+  paymentEvidenceId String
+  allocatedAmount  Int         // Nominal yang dialokasikan ke pesanan ini (total bukti = sum allocations)
+
+  // FK ke Order
+  orderOrderId   String
+  // FK ke PaymentEvidence
+  paymentEvidenceUserId String
+}
+
+// ==========================================
+// 5. REFUND & PENJUALAN OFFLINE
+// ==========================================
+
+model RefundRecord {
+  id            String      @id @default(uuid())
+  orderId       String?
+  refundAmount  Int
+  reason        String
+  processedById String
+  refundedAt    DateTime    @default(now())
+
+  // FK ke Order
+  orderOrderId   String?
+  // FK ke User
+  processorUserId String
+}
+
+// OfflineSale: penjualan langsung di booth CFD (BR-019, BR-OFF-001)
+model OfflineSale {
+  id            String      @id @default(uuid())
+  recordedById  String
+  soldAt        DateTime    @default(now())
+
+  // FK ke User
+  userUserId    String
+}
+
+// OfflineSaleItem: item dalam penjualan offline (BR-012, BR-OFF-001)
+model OfflineSaleItem {
+  id            String      @id @default(uuid())
+  offlineSaleId String
+  bookId        String
+  quantity      Int
+  actualSellingPrice Int
+  costPrice     Int
+
+  // FK ke OfflineSale
+  offlineSaleOfflineSaleId String
+  // FK ke Book
+  bookBookId     String
+}
+
+// ==========================================
+// 6. TOKO LIBUR & STATUS
+// ==========================================
+
+model StoreStatus {
+  id            String      @id @default(uuid())
+  isOpen        Boolean
+  activeClosureReason String?
+  updatedAt     DateTime @default(now())
+}
+
+model StoreClosureHistory {
+  id            String      @id @default(uuid())
+  closedAt      DateTime
+  reopenedAt    DateTime?
+  actorNameSnapshot String
+  actorRoleSnapshot String
+  lastReason    String
+
+  // FK reference ke user (sebagai reference historis)
+  actorUserId String
+}
+
+// ==========================================
+// 7. NOTIFIKASI & PENGINGAT
+// ==========================================
+
+model Notification {
+  id            String      @id @default(uuid())
+  userId        String
+  groupKey      String
+  message       String
+  isRead        Boolean @default(false)
+  retryCount    Int @default(0)
+  createdAt     DateTime @default(now())
+
+  // FK ke User
+  userUserId    String
+}
+
+model ScheduledReminder {
+  id            String      @id @default(uuid())
+  orderId       String?
+  type          String
+  nextRunAt     DateTime
+  isResolved    Boolean @default(false)
+
+  // FK ke Order
+  orderOrderId   String?
+}
+
+// ==========================================
+// 8. AUDIT LOG IMMUTABLE (BR-024, GR-06)
+// ==========================================
+
+model AdminAuditLog {
+  id            String      @id @default(uuid())
+  actorId       String
+  actorRoleSnapshot String
+  action        String
+  targetEntity  String
+  targetId      String
+  oldValue      Json
+  newValue      Json
+  reason        String?
+  createdAt     DateTime @default(now())
+}
+
+// ==========================================
+// 9. ENUM STATIS & PENNGAT
+// ==========================================
+
+enum BookStatus {
+  TERSEDIA
+  SEDANG_DIPESAN
+  TERJUAL
+  NONAKTIF
+}
+
+enum OrderStatus {
+  MENUNGGU_PEMBAYARAN
+  SUDAH_DIBAYAR
+  MENUNGGU_DIAMBIL
+  SELESAI
+  DIBATALKAN
+}
+
+enum PaymentProofStatus {
+  BELUM_DIUNGGAH
+  MENUNGGU_VERIFIKASI
+  PERLU_BUKTI_BARU
+  TERVERIFIKASI
+}
+
+enum PickupStatus {
+  MENUNGGU_KONFIRMASI
+  DISETUJUI
+  PERLU_TANGGAL_BARU
+  PERUBAHAN_MENUNGGU_PERSETUJUAN
+}
+
+enum RefundStatus {
+  TIDAK_BERLAKU
+  PERLU_DIPROSES
+  DIKEMBALIKAN_SEBAGIAN
+  SELESAI
+}
+
+enum PaymentMethod {
+  QRIS
+  TUNAI_CFD
 }
