@@ -1,69 +1,216 @@
-import Image from "next/image";
+// src/app/page.tsx
+// Halaman beranda awal — komponen utama untuk route /
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import { formatRupiah, hitungSelisihMenit, cekTenggatLewati } from '@/lib/timezone';
+import { can, boleLihatModalLaba } from '@/lib/rbac';
+
+// Import komponen styling (CSS modules sudah konfigurasinya)
+import styles from '@/app/globals.css';
+
+// Type untuk fitur utama
+type Fitur = {
+  title: string;
+  description: string;
+};
+
+// Data fitur (dapat di-extract ke file terpisah nanti)
+const fiturUtama: Fitur[] = [
+  {
+    title: 'Katalog Buku',
+    description: 'Cari dan filter buku berdasarkan judul, penulis, atau kategori',
+  },
+  {
+    title: 'Pemesanan Online',
+    description: 'Pesan buku dengan jadwal pengambilan Minggu di booth CFD',
+  },
+  {
+    title: 'Pembayaran QRIS',
+    description: 'Transfer QRIS toko, unggah bukti, verifikasi 2 tahap',
+  },
+  {
+    title: 'Jadwal Pengambilan',
+    description: 'Ambil buku setiap Minggu pagi di booth (tutup 09.00)',
+  },
+  {
+    title: 'Laporan Keuangan',
+    description: 'Lihat laporan penjualan, modal, dan laba (Admin Utama)',
+  },
+];
+
+// Data untuk pengunjung
+const dataPengunjung = {
+  nama: 'Pengunjung Biasa',
+  dapatAkses: [
+    'Lihat katalog',
+    'Daftar akun',
+    'Login',
+  ],
+};
+
+// Data untuk pelanggan
+const dataPelanggan = {
+  nama: 'Pelanggan Terlogin',
+  dapatAkses: [
+    'Kelola keranjang',
+    'Buat pesanan',
+    'Lihat pesanan saya',
+    'Upload bukti pembayaran',
+  ],
+};
+
+export default function Page() {
+  const [role, setRole] = useState<'guest' | 'customer' | 'admin'>('guest');
+
+  // Cek role dari localStorage atau cookie (simulasi)
+  useEffect(() => {
+    const savedRole = localStorage.getItem('userRole');
+    if (savedRole) {
+      setRole(savedRole as 'guest' | 'customer' | 'admin');
+    }
+  }, []);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <main>
+      {/* Bagian Hero */}
+      <header className="hero-section">
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          <h1 className="hero-title">
+            Selamat Datang di <span className="accent-color">Akira Books</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+          <p className="hero-desc">
+            Website operasional toko buku bacaan original dan bekas
           </p>
+
+          <div className="hero-buttons">
+            <button
+              className="btn btn-primary"
+              onClick={() => setRole('customer')}
+            >
+              Masuk sebagai Pelanggan
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setRole('admin')}
+            >
+              Masuk sebagai Admin
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      {/* Bagian Fitur Utama */}
+      <section className="fitur-section py-12">
+        <div className="max-w-7xl mx-auto px-4">
+          <h2 className="section-header mb-8">Fitur Utama</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {fiturUtama.map(fitur => (
+              <div
+                key={fitur.title}
+                className="fitur-card p-6 rounded border var(--warna-border)"
+              >
+                <h3 className="fitur-title mb-3">{fitur.title}</h3>
+                <p className="fitur-desc">{fitur.description}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </main>
-    </div>
+      </section>
+
+      {/* Bagian Hak Akses berdasarkan Peran */}
+      {role === 'guest' && (
+        <section className="hak-akses-section py-12">
+          <div className="max-w-7xl mx-auto px-4">
+            <h2 className="section-header mb-8">Halo Pengunjung!</h2>
+
+            <p className="body mb-6">
+              Anda sedang login sebagai pengunjung. Anda dapat mengakses fitur berikut:
+            </p>
+
+            <ul className="list-disc list-inside space-y-3 text-left">
+              {dataPengunjung.dapatAkses.map(akses => (
+                <li key={akses}>{akses}</li>
+              ))}
+            </ul>
+
+            <p className="mt-4">
+              Buat akun atau login untuk mengakses fitur lengkap.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {role === 'customer' && (
+        <section className="hak-akses-section py-12">
+          <div className="max-w-7xl mx-auto px-4">
+            <h2 className="section-header mb-8">Halo Pelanggan!</h2>
+
+            <p className="body mb-6">
+              Anda login sebagai pelanggan. Anda dapat mengakses fitur berikut:
+            </p>
+
+            <ul className="list-disc list-inside space-y-3 text-left">
+              {dataPelanggan.dapatAkses.map(akses => (
+                <li key={akses}>{akses}</li>
+              ))}
+            </ul>
+
+            <p className="mt-4">
+              Anda dapat membuat pesanan, mengelola keranjang, dan mengunggah bukti pembayaran.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {role === 'admin' && (
+        <section className="hak-akses-section py-12">
+          <div className="max-w-7xl mx-auto px-4">
+            <h2 className="section-header mb-8">Halo Admin!</h2>
+
+            <p className="body mb-6">
+              Anda login sebagai admin. Anda dapat mengakses fitur admin lengkap.
+            </p>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <h3>Peran Admin Biasa</h3>
+                <ul className="list-disc list-inside space-y-2 text-sm">
+                  {['Kelola buku', 'Verifikasi pembayaran', 'Buka tutup toko libur'].map(
+                    fitur => <li key={fitur}>{fitur}</li>
+                  )}
+                  <li style={{ color: 'red' }}>
+                    Hanya Admin Utama yang boleh melihat modal & laba
+                    <p className="text-xs">
+                      GR-03: Isolasi modal & laba
+                    </p>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3>Peran Admin Utama</h3>
+                <ul className="list-disc list-inside space-y-2 text-sm">
+                  {['Semua fitur', 'Kelola admin', 'Lihat laba historis'].map(
+                    fitur => <li key={fitur}>{fitur}</li>
+                  )}
+                  <li style={{ color: 'green' }}>
+                    Bisa lihat modal, laba, koreksi nominal pembayaran
+                    <p className="text-xs">
+                      Hak lengkap sesuai BR-005
+                    </p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <p className="mt-6">
+              Silakan pilih peran di atas untuk melanjutkan.
+            </p>
+          </div>
+        </section>
+      )}
+    </main>
   );
 }
