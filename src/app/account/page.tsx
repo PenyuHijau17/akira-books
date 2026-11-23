@@ -1,3 +1,5 @@
+'use client';
+
 // src/app/account/page.tsx
 // Halaman Profil Customer — 100% Bahasa Indonesia, tema kertas klasik (krem & cokelat)
 

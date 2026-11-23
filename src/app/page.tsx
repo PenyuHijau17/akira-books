@@ -1,3 +1,5 @@
+'use client';
+
 // src/app/page.tsx
 // Halaman beranda awal — komponen utama untuk route /
 
