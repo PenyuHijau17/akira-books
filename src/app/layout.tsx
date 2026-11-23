@@ -20,8 +20,7 @@ const Header = () => {
         <div className="nav-links">
           <a href="/katalog">Katalog</a>
           <a href="/keranjang">Keranjang</a>
-          {/* Link login akan muncul berdasarkan peran */}
-          <a href="/masuk">Masuk</a>
+          <a href="/account">Akun</a>
         </div>
       </div>
     </nav>

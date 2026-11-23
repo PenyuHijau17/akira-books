@@ -1,6 +1,6 @@
-// src/app/middleware.ts
-// Middleware otorisasi server-side untuk Next.js App Router
-// GR-02, BR-002: Semua hak akses divalidasi di server
+// src/middleware.ts
+// Middleware otorisasi server-side untuk Next.js
+// GR-02, BR-002: Semua hak akses divalidasi di server, bukan hanya menyembunyikan tombol UI
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
