@@ -106,7 +106,7 @@ export const MATRIX_AKSES: Record<RolePengguna, Record<string, boolean>> = {
     VerifikasiBukti: true, // Pemeriksaan awal 2 tahap (BR-014)
     AjukanUbahJadwal: true,
     NonaktifkanAkun: true,
-    KelolaAdmin: false, // Bukan admin yang bisa membuat admin lain
+    KelolaAdmin: false, // Bukan admin yang bisa membuat admin lain (GR-03: hanya Admin Utama)
 
     // Batal & Refund
     BatalPesanan: true, // Admin Biasa bisa batal sebelum pembayaran final
@@ -119,7 +119,6 @@ export const MATRIX_AKSES: Record<RolePengguna, Record<string, boolean>> = {
     TolakBanner: false, // Harus Admin Utama
 
     // Admin features terlarang
-    KelolaAdmin: false,
     // costPrice sama sekali tidak ada di DTO/Admin Biasa
   },
 
