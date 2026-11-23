@@ -1,5 +1,6 @@
 // src/lib/auth.ts
-// Helper otorisasi server-side untuk 4 peran
+// Helper otorisasi server-side untuk 4 peran: Pengunjung, Customer, Admin Biasa, Admin Utama
+// Semua validasi hak akses divalidasi di server (GR-02, BR-002)
 
 // Fungsi rate limit
 export function cekRateLimitLogin(ip: string): { terlaluCepat: boolean; sisaMenit: number } {
@@ -8,6 +9,7 @@ export function cekRateLimitLogin(ip: string): { terlaluCepat: boolean; sisaMeni
 
 /// <summary>
 /// Abstraksi layanan email ke terminal server
+/// sesuai OD-04 (GR-09: banner promo ditunda dari MVP, email ke terminal)
 /// </summary>
 export function kirimEmailKeTerminal(to: string, subject: string, body: string) {
   console.log('[EMAIL]', to, subject, body);
