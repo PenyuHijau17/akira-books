@@ -21,6 +21,8 @@ const Header = () => {
           <a href="/katalog">Katalog</a>
           <a href="/keranjang">Keranjang</a>
           <a href="/account">Akun</a>
+          {/* Admin links - akan divalidasi middleware */}
+          {/* Role akan ditambahkan melalui query params atau middleware */}
         </div>
       </div>
     </nav>

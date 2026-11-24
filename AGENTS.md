@@ -53,3 +53,45 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
 | GR-07 | **Checkpoint GitHub** | Kerjakan satu tahap pada satu waktu, jalankan verifikasi, lalu berhenti untuk ditinjau pengguna sebelum `git commit` / `git push`[cite: 4]. |
 | GR-08 | **Model Stok Per Judul** | Setiap judul buku memiliki sekumpulan stok total numerik (`integer >= 0`) dan modal per unit tanpa pemisahan data fisik/kondisi per eksemplar[cite: 4]. |
 | GR-09 | **Prioritas Fitur Inti MVP** | Fitur **Banner Promosi** (`FR-BNR` / Tahap 6) **ditunda dari MVP awal** atas keputusan pemilik proyek. Fokus pengerjaan hanya pada fitur inti operasional toko (katalog, stok, pemesanan, pembayaran QRIS/CFD, jadwal Minggu, penjualan offline, laporan, dan Toko Libur). |
+| GR-10 | **Unit Testing & Kualitas Kode** | Setiap implementasi tahap baru wajib disertai file unit test (*.test.ts) untuk logika bisnis, RBAC, dan guardrails terkait (GR-03, GR-06). Sebelum dianggap selesai, kode wajib lulus `docker compose exec app npx tsc --noEmit` (0 error) dan `docker compose exec app npm test` (semua test PASS) |
+
+---
+
+## 4. Daftar Keputusan Bisnis (OD-xx)
+
+| ID | Keputusan |
+|---|---|
+| OD-01 | Status utama pesanan Menunggu Pembayaran hingga pembayaran final Admin Utama; jika jadwal disetujui → Menunggu Diambil; jika belum → Sudah Dibayar dulu |
+| OD-02 | Kolom mergedIntoBookId di Book untuk merge duplikat; stockTotal dipindahkan ke buku utama |
+| OD-03 | Tabel OrderPaymentAllocation (many-to-many Order ↔ PaymentEvidence) dengan allocatedAmount |
+| OD-04 | Banner Promosi ditunda dari MVP (GR-09); format upload JPG/PNG/WebP max 5MB; email abstraksi log-terminal |
+
+---
+
+## 4. Protokol Work State
+
+### Completed
+- Tahap 1: Semua keputusan OD-01 s.d. OD-04 diterima dan dicatat di prisma/schema.prisma (dinaikkan melalui migrasi)
+- Tahap 2: `docker compose up -d --build` berhasil; `prisma migrate dev --name init-tahap-1` sukses, 24 tabel dibuat di PostgreSQL
+- Tahap 3: Semua file kode untuk fondasi aplikasi telah dibuat dan diverifikasi `tsc --noEmit` 0 error di dalam container Docker
+- Tahap 4: Autentikasi & Hak Akses lengkap implementasi
+  - Login/register/lupa-password halaman UI dengan 100% Bahasa Indonesia
+  - API Routes auth, admin management terhubung ke PostgreSQL via Prisma Client
+  - Middleware otorisasi server-side di src/middleware.ts
+  - Password hashing dengan crypto.scryptSync ( lebih aman daripada SHA-256 polos)
+  - Script seed prisma/seed.ts untuk membuat akun Admin Utama awal beserta recovery code-nya
+  - Admin account management endpoint: nonaktifkan/aktifkan Customer, buat/cabut Admin Biasa oleh Admin Utama dengan verifikasi OTP
+  - Semua file kode tahap 4 diverifikasi `tsc --noEmit` 0 error
+
+### Active
+- (none)
+
+### Blocked
+- (none)
+
+## 5. Implementasi Tahap Selanjutnya
+
+- **Tahap 5**: Katalog, Pengelolaan Buku, & Toko Libur - Selesai dan diverifikasi
+- **Tahap 6**: Unit Testing dan Quality Assurance - Selanjutnya
+
+Today's date: Mon Nov 23 2026

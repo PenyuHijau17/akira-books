@@ -71,6 +71,18 @@ model Category {
   name      String      @unique
 }
 
+// Stock movement history untuk mencatat setiap perubahan stok
+model StockMovement {
+  id            String      @id @default(uuid())
+  bookId        String
+  type          String      // "MASUK" | "KELUAR" | "ADJUSTMENT"
+  quantity      Int
+  reason        String?
+  createdAt     DateTime    @default(now())
+  createdBy     String?     // User ID yang melakukan perubahan
+}
+
+// Model Buku
 model Book {
   id                String      @id @default(uuid())
   code              String      @unique
@@ -91,6 +103,9 @@ model Book {
 
   // FK ke Category
   categoryId       String
+
+  // Riwayat harga modal (Admin Utama saja)
+  BookCostHistory   BookCostHistory[]
 }
 
 // BookCategory many-to-mana menggunakan @@unique
@@ -100,7 +115,7 @@ model BookCategory {
   @@unique([bookId, categoryId])
 }
 
-// Riwayat harga modal (Admin Utama saja)
+// Riwayat harga modal (Admin Utama saja) - model terpisah dengan @relation
 model BookCostHistory {
   id            String      @id @default(uuid())
   bookId        String
@@ -109,6 +124,8 @@ model BookCostHistory {
   reason        String
   changedById   String      // Admin Utama ID
   createdAt     DateTime    @default(now())
+
+  book          Book        @relation(fields: [bookId], references: [id])
 }
 
 // ==========================================
@@ -302,8 +319,6 @@ model StoreClosureHistory {
   actorNameSnapshot String
   actorRoleSnapshot String
   lastReason    String
-
-  // FK reference ke user (sebagai reference historis)
   actorUserId String
 }
 
