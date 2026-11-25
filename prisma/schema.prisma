@@ -322,6 +322,21 @@ model StoreClosureHistory {
   actorUserId String
 }
 
+model Banner {
+  id                String      @id @default(uuid())
+  title               String?
+  description         String?
+  imageUrl            String      // Wajib diunggah
+  url                String?     // URL tujuan (opsional)
+  sortOrder         Int         @default(0)
+  status             String      // "PENDING" | "ACTIVE" | "INACTIVE" | "REJECTED" | "CANCELLED"
+  submittedById      String      // User ID pengaju
+  rejectedById       String?     // Admin Utama yang menolak
+  rejectedAt         DateTime?
+  rejectReason       String?     // Alasan penolakan (hanya terbaca Admin Utama)
+  createdAt         DateTime    @default(now())
+}
+
 // ==========================================
 // 7. NOTIFIKASI & PENGINGAT
 // ==========================================

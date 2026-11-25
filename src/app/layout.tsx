@@ -23,6 +23,13 @@ const Header = () => {
           <a href="/account">Akun</a>
           {/* Admin links - akan divalidasi middleware */}
           {/* Role akan ditambahkan melalui query params atau middleware */}
+          {typeof window !== "undefined" &&
+            (window as any).userRole === "ADMIN_UTAMA" &&
+            (
+              <a href="/admin/banner" className="nav-link">
+                Banner Promo
+              </a>
+            )}
         </div>
       </div>
     </nav>

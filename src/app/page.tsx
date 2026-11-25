@@ -74,7 +74,7 @@ export default function Page() {
 
   return (
     <main>
-      {/* Bagian Hero */}
+      // Bagian Hero
       <header className="hero-section">
         <div className="max-w-7xl mx-auto px-4 py-12">
           <h1 className="hero-title">

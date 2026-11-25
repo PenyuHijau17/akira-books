@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     alias: {
       '@': '/src',
+      '@/components': '/src/components',
     },
     // Timeout untuk test (diabaikan selama development tsc check)
     // timeout: 30000,
