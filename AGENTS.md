@@ -130,9 +130,19 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - GR-03: `saringPenjualanUntukPeran` menghapus semua field modal/laba untuk Admin Biasa; endpoint `/api/admin/laporan` mengembalikan 403 sebelum query; menu laporan hanya dirender untuk Admin Utama
   - Dashboard `/admin/laporan` (filter harian/bulanan/tahunan WIB) dan `/admin/penjualan-offline` memakai `@/components/ui`, 100% Bahasa Indonesia; tautan Header ditambahkan sesuai peran
   - Unit test baru: `penjualan-offline-laporan.test.ts`, `penjualan-offline-db.test.ts`, `penjualan-offline-isolasi.test.ts`, `penjualan-offline-koreksi-db.test.ts`; `tsc --noEmit` 0 error dan `npm test` 22 file / 225 test PASS
+- Tahap 12: Notifikasi dan Pengingat (implementasi selesai, belum di-commit/di-push)
+  - Migrasi `20261128040000_tahap_12_notifikasi_pengingat` diterapkan; `prisma migrate status` up to date (12 migrasi)
+  - `Notification` diperluas dengan `kategori`, `entitasId`, `metadata`, `readAt`, kunci unik per penerima, dan indeks inbox; `ScheduledReminder` memperoleh `jobKey`, `intervalMenit`, `zonaWaktu`, dan `terakhirDijalankan`
+  - Model baru `NotificationOutbox` dengan `deliveryKey` unik, `attempts`, `maxAttempts`, `nextAttemptAt`, dan `escalationNotified` untuk retry bertahap anti-duplikasi
+  - Inbox `/notifikasi` + API `/api/notifikasi` (baca, tandai satuan, tandai semua) dengan isolasi per akun; badge belum dibaca di Header; pengelompokan notifikasi sejenis tanpa menghapus detail individual
+  - Outbox eksternal hanya abstraksi log-terminal bila `AKIRA_NOTIF_EKSTERNAL=terminal`; tanpa layanan/Mailpit baru (GR-01, OD-04)
+  - Eskalasi kegagalan retry maksimal muncul di inbox Admin Utama dan panel `/admin/notifikasi` (`/api/admin/notifikasi/outbox`); tindak lanjut tercatat di `AdminAuditLog` append-only (GR-06)
+  - Pengingat 2 jam WIB persisten lintas restart Docker/server, berhenti setelah pembayaran diputuskan, jadwal diputuskan, pesanan dibatalkan/Selesai (BR-025); `instrumentation.ts` mengejar tugas yang jatuh tempo saat startup
+  - GR-03: `saringNotifikasiUntukPeran` membuang modal/laba secara rekursif untuk Customer/Admin Biasa sebelum payload dikirim
+  - Unit test baru: `notifikasi-grouping.test.ts`, `notifikasi-mark-read.test.ts`, `notifikasi-outbox.test.ts`, `notifikasi-pengingat.test.ts`; `tsc --noEmit` 0 error dan `npm test` 26 file / 234 test PASS
 
 ### Active
-- Tahap 10 dan Tahap 11 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
+- Tahap 12 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
 
 ### Blocked
 - (none)
@@ -142,5 +152,6 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
 - **Tahap 9**: Selesai, ditinjau, dan di-push (commit `0002298`)
 - **Tahap 10**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
 - **Tahap 11**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
+- **Tahap 12**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
 
 Today's date: Mon Nov 23 2026

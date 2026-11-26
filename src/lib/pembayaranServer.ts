@@ -6,6 +6,8 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import prisma from '@/lib/prisma'
 import { kirimEmailKeTerminal } from '@/lib/auth'
+import { kategoriDariKunci } from '@/lib/notifikasi'
+import { enqueueOutbox } from '@/lib/notifikasiServer'
 
 export type BerkasServer = {
   name: string
@@ -129,24 +131,51 @@ export async function buatNotifikasi(params: {
   userId: string
   groupKey: string
   message: string
+  kategori?: string | null
+  entitasId?: string | null
+  metadata?: any
   client?: any
 }) {
   const client = params.client ?? prisma()
+  // BR-003: kunci pengiriman bersifat per penerima, bukan global antar akun.
   const sudah = await client.notification.findFirst({
-    where: { groupKey: params.groupKey },
+    where: { userId: params.userId, groupKey: params.groupKey },
     select: { id: true },
   })
   if (sudah) return null
-  return client.notification.create({
+
+  const dibuat = await client.notification.create({
     data: {
       userId: params.userId,
       userUserId: params.userId,
       groupKey: params.groupKey,
+      kategori: params.kategori || kategoriDariKunci(params.groupKey),
+      entitasId: params.entitasId || null,
+      metadata: params.metadata ?? null,
       message: params.message,
       isRead: false,
+      readAt: null,
       retryCount: 0,
     },
   })
+
+  // Outbox persisten: IN_APP langsung tercatat terkirim, kanal eksternal mengikuti aturan retry.
+  try {
+    await enqueueOutbox({
+      userId: params.userId,
+      groupKey: params.groupKey,
+      message: params.message,
+      kanal: 'IN_APP',
+      kategori: dibuat.kategori,
+      entitasId: dibuat.entitasId,
+      deliveryKey: `in_app|${params.userId}|${params.groupKey}`,
+      client,
+    })
+  } catch (error) {
+    console.error('[OUTBOX] gagal mengantri notifikasi:', error)
+  }
+
+  return dibuat
 }
 
 export async function notifikasiAdmins(params: {
@@ -174,17 +203,25 @@ export async function buatReminder(params: {
   orderId: string
   type: 'PENGINGAT_BUKTI' | 'PENGINGAT_PUTUSAN' | 'PENGINGAT_JADWAL'
   jam?: number
+  jobKey?: string
   client?: any
 }) {
   const client = params.client ?? prisma()
   const jam = params.jam ?? 2
+  const sekarang = new Date()
+  const jobKey =
+    params.jobKey || `${params.orderId}:${params.type}:${sekarang.getTime()}:${Math.random().toString(36).slice(2, 8)}`
   return client.scheduledReminder.create({
     data: {
       orderId: params.orderId,
       orderOrderId: params.orderId,
       type: params.type,
-      nextRunAt: new Date(Date.now() + jam * 60 * 60 * 1000),
+      jobKey,
+      intervalMenit: Math.max(1, Math.floor(jam * 60)),
+      zonaWaktu: 'Asia/Jakarta',
+      nextRunAt: new Date(sekarang.getTime() + jam * 60 * 60 * 1000),
       isResolved: false,
+      createdAt: sekarang,
     },
   })
 }

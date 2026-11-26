@@ -5,6 +5,7 @@
 // Tautan admin hanya ditampilkan untuk peran admin; otorisasi tetap di server (GR-02).
 
 import { useEffect, useState } from "react"
+import { formatBadgeBelumDibaca } from "@/lib/notifikasi"
 
 type User = {
   id: string
@@ -15,6 +16,7 @@ type User = {
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null)
+  const [belumDibaca, setBelumDibaca] = useState(0)
   const [memuat, setMemuat] = useState(true)
 
   useEffect(() => {
@@ -24,9 +26,25 @@ export default function Header() {
       try {
         const res = await fetch("/api/auth", { cache: "no-store" })
         const data = await res.json()
-        if (aktif) setUser(data?.user ?? null)
+        const pengguna = data?.user ?? null
+        if (aktif) setUser(pengguna)
+
+        if (pengguna && ["CUSTOMER", "ADMIN_BIASA", "ADMIN_UTAMA"].includes(pengguna.role)) {
+          try {
+            const notifRes = await fetch("/api/notifikasi?ringkas=1", { cache: "no-store" })
+            const notifData = await notifRes.json()
+            if (aktif) setBelumDibaca(Number(notifData?.belumDibaca) || 0)
+          } catch {
+            if (aktif) setBelumDibaca(0)
+          }
+        } else if (aktif) {
+          setBelumDibaca(0)
+        }
       } catch {
-        if (aktif) setUser(null)
+        if (aktif) {
+          setUser(null)
+          setBelumDibaca(0)
+        }
       } finally {
         if (aktif) setMemuat(false)
       }
@@ -64,6 +82,25 @@ export default function Header() {
           <a href="/katalog">Katalog</a>
           <a href="/keranjang">Keranjang</a>
           <a href="/pesanan">Pesanan</a>
+          {!memuat && user && (
+            <a href="/notifikasi" style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+              Notifikasi
+              {formatBadgeBelumDibaca(belumDibaca) && (
+                <span
+                  className="nav-link"
+                  style={{
+                    background: "#8b3a3a",
+                    color: "#fff",
+                    borderRadius: "999px",
+                    padding: "0.1rem 0.45rem",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  {formatBadgeBelumDibaca(belumDibaca)}
+                </span>
+              )}
+            </a>
+          )}
           <a href="/account">Akun</a>
 
           {adalahAdmin && <a href="/admin/buku">Kelola Buku</a>}
@@ -74,6 +111,7 @@ export default function Header() {
           {adalahAdmin && <a href="/admin/penjualan-offline">Penjualan Offline</a>}
           {user?.role === "ADMIN_UTAMA" && <a href="/admin/laporan">Laporan Keuangan</a>}
           {user?.role === "ADMIN_UTAMA" && <a href="/admin/qris">QRIS Toko</a>}
+          {user?.role === "ADMIN_UTAMA" && <a href="/admin/notifikasi">Peringatan Notifikasi</a>}
           {adalahAdmin && <a href="/admin/banner">Banner Promo</a>}
 
           {!memuat && !user && (

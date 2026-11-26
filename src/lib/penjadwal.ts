@@ -16,6 +16,14 @@ import {
   catatRiwayatStatus,
   selesaikanReminder,
 } from '@/lib/pembayaranServer'
+import { enqueueOutbox, jalankanOutbox } from '@/lib/notifikasiServer'
+import {
+  jenisPengingatValid,
+  kunciPengingat,
+  penilaianPengingat,
+  pesanPengingat,
+  type JenisPengingat,
+} from '@/lib/pengingat'
 
 const ALASAN_AUTO_CANCEL = 'Batas Waktu Pembayaran Terlewati'
 
@@ -305,7 +313,7 @@ export async function jalankanNoShow(sekarang: Date = new Date()): Promise<numbe
   return ditandai
 }
 
-/** Pengingat 2 jam: anti-duplikasi via groupKey dan tetap jalan setelah restart. */
+/** Pengingat 2 jam: kunci pengiriman unik per langkah & tetap jalan setelah restart. */
 export async function jalankanPengingat(sekarang: Date = new Date()): Promise<number> {
   const client = prisma()
   const reminders = await client.scheduledReminder.findMany({
@@ -317,7 +325,7 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
   let terkirim = 0
 
   for (const reminder of reminders) {
-    if (!reminder.orderId) {
+    if (!reminder.orderId || !jenisPengingatValid(String(reminder.type))) {
       await client.scheduledReminder.update({
         where: { id: reminder.id },
         data: { isResolved: true },
@@ -325,6 +333,7 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
       continue
     }
 
+    const type = reminder.type as JenisPengingat
     const order = await client.order.findUnique({ where: { id: reminder.orderId } })
     if (!order) {
       await client.scheduledReminder.update({
@@ -334,34 +343,29 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
       continue
     }
 
-    const masihPerlu =
-      reminder.type === 'PENGINGAT_BUKTI'
-        ? order.paymentProofStatus === 'MENUNGGU_VERIFIKASI'
-        : reminder.type === 'PENGINGAT_PUTUSAN'
-          ? order.paymentReviewStatus === 'MENUNGGU_PUTUSAN_UTAMA'
-          : ['MENUNGGU_KONFIRMASI', 'PERUBAHAN_MENUNGGU_PERSETUJUAN'].includes(order.pickupStatus)
-
-    if (!masihPerlu) {
-      await selesaikanReminder({
-        orderId: order.id,
-        types: [
-          reminder.type as 'PENGINGAT_BUKTI' | 'PENGINGAT_PUTUSAN' | 'PENGINGAT_JADWAL',
-        ],
-      })
+    // BR-025: hentikan lebih awal jika keputusan sudah dibuat (termasuk restart saat jeda).
+    const penilaian = penilaianPengingat({
+      type,
+      orderStatus: order.orderStatus,
+      paymentProofStatus: order.paymentProofStatus,
+      paymentReviewStatus: order.paymentReviewStatus,
+      pickupStatus: order.pickupStatus,
+      cancelledAt: order.cancelledAt,
+      completedAt: order.completedAt,
+      isResolved: reminder.isResolved,
+    })
+    if (penilaian.harusBerhenti) {
+      await selesaikanReminder({ orderId: order.id, types: [type], client })
       continue
     }
 
     const langkah = (order.reminderStep || 0) + 1
-    const groupKey = `pengingat:${reminder.type}:${order.id}:${langkah}`
-    const pesan =
-      reminder.type === 'PENGINGAT_BUKTI'
-        ? `Pengingat: bukti pembayaran pesanan ${order.orderNumber} belum diperiksa.`
-        : reminder.type === 'PENGINGAT_PUTUSAN'
-          ? `Pengingat: putusan final pembayaran pesanan ${order.orderNumber} belum diambil.`
-          : `Pengingat: jadwal pesanan ${order.orderNumber} masih menunggu keputusan.`
+    const groupKey = kunciPengingat(order.id, type, langkah)
+    const pesan = pesanPengingat(type, order.orderNumber)
+    const kategori = type === 'PENGINGAT_JADWAL' ? 'JADWAL' : 'PEMBAYARAN'
 
     let penerima: Array<{ id: string }>
-    if (reminder.type === 'PENGINGAT_JADWAL') {
+    if (type === 'PENGINGAT_JADWAL') {
       const usulan = await client.jadwalPerubahan.findFirst({
         where: { orderId: order.id, status: 'MENUNGGU_PERSETUJUAN' },
         orderBy: { createdAt: 'desc' },
@@ -377,7 +381,7 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
       penerima = await client.user.findMany({
         where: {
           role:
-            reminder.type === 'PENGINGAT_PUTUSAN'
+            type === 'PENGINGAT_PUTUSAN'
               ? 'ADMIN_UTAMA'
               : { in: ['ADMIN_BIASA', 'ADMIN_UTAMA'] },
           isActive: true,
@@ -386,13 +390,29 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
       })
     }
 
-    for (const admin of penerima) {
+    for (const penerimaItem of penerima) {
+      const kunci = `${groupKey}:${penerimaItem.id}`
       const dibuat = await buatNotifikasi({
-        userId: admin.id,
-        groupKey: `${groupKey}:${admin.id}`,
+        userId: penerimaItem.id,
+        groupKey: kunci,
         message: pesan,
+        kategori,
+        entitasId: order.id,
+        metadata: { langkah, sumber: 'PENGINGAT_2_JAM' },
+        client,
       })
-      if (dibuat) terkirim += 1
+      if (!dibuat) continue
+      terkirim += 1
+      await enqueueOutbox({
+        userId: penerimaItem.id,
+        groupKey: kunci,
+        message: pesan,
+        kanal: 'EMAIL',
+        kategori,
+        entitasId: order.id,
+        deliveryKey: `email:${kunci}`,
+        client,
+      }).catch((error) => console.error('[OUTBOX PENGINGAT] gagal mengantri:', error))
     }
 
     await client.order.update({
@@ -401,7 +421,10 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
     })
     await client.scheduledReminder.update({
       where: { id: reminder.id },
-      data: { nextRunAt: new Date(sekarang.getTime() + 2 * 60 * 60 * 1000) },
+      data: {
+        nextRunAt: new Date(sekarang.getTime() + (reminder.intervalMenit || 120) * 60_000),
+        terakhirDijalankan: sekarang,
+      },
     })
   }
 
@@ -410,11 +433,12 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
 
 export async function jalankanTugasPembayaran(
   sekarang: Date = new Date()
-): Promise<{ dibatalkan: number; pengingat: number; noShow: number }> {
+): Promise<{ dibatalkan: number; pengingat: number; noShow: number; outbox: Awaited<ReturnType<typeof jalankanOutbox>> }> {
   const dibatalkan = await jalankanAutoCancel(sekarang)
   const pengingat = await jalankanPengingat(sekarang)
   const noShow = await jalankanNoShow(sekarang)
-  return { dibatalkan, pengingat, noShow }
+  const outbox = await jalankanOutbox({ sekarang })
+  return { dibatalkan, pengingat, noShow, outbox }
 }
 
 /** Interval in-process; statusnya tetap berasal dari database sehingga aman restart. */

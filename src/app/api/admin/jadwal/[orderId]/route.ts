@@ -36,6 +36,7 @@ import {
   buatReminder,
   catatAudit,
   catatRiwayatStatus,
+  selesaikanReminder,
 } from '@/lib/pembayaranServer'
 
 function gagal(pesan: string, status: number) {
@@ -609,7 +610,12 @@ export async function POST(
             actorRole: actor.role,
             client: tx,
           })
-          await selesaikanPengingatJadwal(tx, orderId)
+          // BR-025: setelah pesanan Selesai, semua pengingat terkait harus berhenti.
+          await selesaikanReminder({
+            orderId,
+            types: ['PENGINGAT_BUKTI', 'PENGINGAT_PUTUSAN', 'PENGINGAT_JADWAL'],
+            client: tx,
+          })
           await catatAudit({
             actorId: actor.id,
             actorRole: actor.role,

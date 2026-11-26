@@ -544,24 +544,65 @@ model Notification {
   id            String      @id @default(uuid())
   userId        String
   groupKey      String
+  kategori      String      @default("UMUM") // PEMBAYARAN | JADWAL | PESANAN | SISTEM | PENJUALAN | UMUM
+  entitasId     String?     // Id pesanan/transaksi terkait untuk pengelompokan
   message       String
+  metadata      Json?       // Data tambahan; wajib disaring untuk Admin Biasa (GR-03)
   isRead        Boolean @default(false)
+  readAt        DateTime?
   retryCount    Int @default(0)
   createdAt     DateTime @default(now())
 
   // FK ke User
   userUserId    String
+
+  // BR-008: satu notifikasi per (penerima, kunci pengiriman)
+  @@unique([userId, groupKey])
+  @@index([userId, isRead, createdAt])
+  @@index([userId, kategori, entitasId])
 }
 
 model ScheduledReminder {
   id            String      @id @default(uuid())
   orderId       String?
   type          String
+  jobKey        String?     @unique // Kunci antrean persisten anti-duplikat
+  intervalMenit Int         @default(120) // Pengingat setiap 2 jam
+  zonaWaktu     String      @default("Asia/Jakarta")
   nextRunAt     DateTime
+  terakhirDijalankan DateTime?
   isResolved    Boolean @default(false)
+  createdAt     DateTime    @default(now())
 
   // FK ke Order
   orderOrderId   String?
+
+  @@index([isResolved, nextRunAt])
+}
+
+/**
+ * Outbox persisten untuk pengiriman eksternal (email/WA masa depan).
+ * deliveryKey unik menjamin idempotent delivery meski retry berulang (BR-008, NFR-01).
+ */
+model NotificationOutbox {
+  id                 String      @id @default(uuid())
+  deliveryKey        String      @unique
+  userId             String
+  kanal              String      @default("IN_APP") // IN_APP | EMAIL | WHATSAPP
+  kategori           String      @default("UMUM")
+  entitasId          String?
+  message            String
+  status             String      @default("PENDING") // PENDING | TERKIRIM | GAGAL | DITINDAKLANJUTI
+  attempts           Int         @default(0)
+  maxAttempts        Int         @default(5)
+  nextAttemptAt      DateTime    @default(now())
+  lastError          String?
+  sentAt             DateTime?
+  escalationNotified Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+
+  @@index([status, nextAttemptAt])
+  @@index([userId, status])
 }
 
 // ==========================================
