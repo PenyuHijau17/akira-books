@@ -91,15 +91,23 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - Halaman `/keranjang`, `/checkout`, `/pesanan`, `/pesanan/[id]` memakai `@/components/ui` dan 100% Bahasa Indonesia
   - Unit test Tahap 7 ditambahkan; `tsc --noEmit` 0 error dan `npm test` 121/121 PASS
   - E2E nyata: blokir toko libur, penyesuaian stok, konfirmasi ulang, idempotensi, dan snapshot terverifikasi
+- Tahap 8: Pembayaran QRIS/CFD, Bukti Pembayaran, dan Alokasi Pembayaran selesai
+  - Migrasi `tahap_8_pembayaran_qris` dan `tahap_8_paused_at` tersinkron; `prisma migrate status` up to date
+  - QRIS toko aktif tunggal dengan riwayat, OTP tindakan sensitif, dan penyimpanan berkas privat
+  - Unggah bukti multi-order, jeda timer ubah metode, pengingat, auto-cancel atomik, dan pelepasan stok sekali
+  - Verifikasi 2 tahap (Admin Biasa → Admin Utama), tolak 2x → ambil alih, CFD/koreksi, dan OD-01
+  - Halaman `/admin/qris`, `/admin/pembayaran`, dan `/pesanan/[id]` memakai `@/components/ui` dan 100% Bahasa Indonesia
+  - Unit test Tahap 8 ditambahkan; `tsc --noEmit` 0 error dan `npm test` 16 file / 165 test PASS
+  - E2E nyata: QRIS + OTP, multi-order, verifikasi & tolak 2x, jeda timer, auto-cancel/cron, CFD, koreksi, isolasi bukti, dan audit append-only terverifikasi
 
 ### Active
-- (none)
+- Tahap 8 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
 
 ### Blocked
 - (none)
 
 ## 5. Implementasi Tahap Selanjutnya
 
-- **Tahap 8**: Pembayaran QRIS/CFD, Bukti Pembayaran, dan Alokasi Pembayaran - Menunggu peninjauan pemilik proyek (GR-07)
+- **Tahap 9**: Menunggu peninjauan Tahap 8 oleh pemilik proyek (GR-07)
 
 Today's date: Mon Nov 23 2026

@@ -31,6 +31,20 @@ export async function GET(
         paymentMethod: true,
         pickupSundayDate: true,
         paymentDeadline: true,
+        paymentReviewStatus: true,
+        paymentRejectedCount: true,
+        paymentRejectReason: true,
+        proofRequestReason: true,
+        proofDeadline: true,
+        paidAt: true,
+        paymentRecordedMethod: true,
+        methodChangeStatus: true,
+        methodChangeTo: true,
+        methodChangeReason: true,
+        methodChangeRequestedAt: true,
+        pausedRemainingSeconds: true,
+        pausedAt: true,
+        cancelReason: true,
         totalAmount: true,
         createdAt: true,
         updatedAt: true,
@@ -54,7 +68,52 @@ export async function GET(
       },
     })
 
-    return NextResponse.json({ pesanan: saringFieldModal({ ...pesanan, orderItems }) })
+    // Riwayat bukti (AC-PAY-002): hanya bukti milik pesanan ini yang dikirim.
+    const alokasi = await prisma().orderPaymentAllocation.findMany({
+      where: { orderId: pesanan.id },
+      select: { paymentEvidenceId: true, allocatedAmount: true },
+    })
+    const idBukti = [...new Set(alokasi.map((a) => a.paymentEvidenceId))]
+    const riwayatBukti = idBukti.length
+      ? await prisma().paymentEvidence.findMany({
+          where: { id: { in: idBukti } },
+          orderBy: { uploadedAt: 'desc' },
+          select: {
+            id: true,
+            imageUrl: true,
+            status: true,
+            amount: true,
+            isLatest: true,
+            rejectionReason: true,
+            proofRequestReason: true,
+            uploadedAt: true,
+          },
+        })
+      : []
+
+    const [perubahanMetode, perpanjangan] = await Promise.all([
+      prisma().paymentMethodChangeRequest.findMany({
+        where: { orderId: pesanan.id },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      prisma().paymentDeadlineExtension.findMany({
+        where: { orderId: pesanan.id },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+    ])
+
+    return NextResponse.json({
+      pesanan: saringFieldModal({
+        ...pesanan,
+        orderItems,
+        riwayatBukti,
+        alokasi,
+        perubahanMetode,
+        perpanjangan,
+      }),
+    })
   } catch (error: any) {
     console.error('API GET /api/pesanan/[id] error:', error)
     return NextResponse.json(

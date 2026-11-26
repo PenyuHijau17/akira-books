@@ -186,10 +186,33 @@ model Order {
   pickupGroupId      String?     // Opsional: gabung jadwal dengan pesanan lain
   paymentDeadline    DateTime    // Tenggat 24 jam sejak pembuatan (BR-009, BR-DUE-001)
   totalAmount        Int         @default(0) // Total nominal snapshot pesanan (BR-011)
-  pausedRemainingSeconds Int?     // Jeda hitung mundur saat ubah metode bayar (BR-016)
+  pausedRemainingSeconds Int?     // Sisa detik saat jeda (BR-016)
+  pausedAt           DateTime?   // Waktu mulai jeda; hanya untuk pengajuan ubah metode
   lockedByAdminId    String?     // Admin yang mengunci order (seperti BR-002)
   lockExpiresAt      DateTime?   // Waktu kunce habis
   allocatedAmount    Int?        // Alih-alih nominal total, tracking per-allocation (OD-03)
+
+  // ===== Tahap 8: Pembayaran, verifikasi 2 tahap, tenggat & race condition =====
+  cancelReason       String?     // Alasan pembatalan (termasuk auto-cancel)
+  stockReleased      Boolean     @default(false) // Idempotensi pelepasan stok (1x)
+  autoCancelled      Boolean     @default(false)
+  paymentReviewStatus String     @default("BELUM_DIPERIKSA")
+  paymentReviewerId  String?     // Pemeriksa awal (Admin Biasa) / pengambil alih (Admin Utama)
+  paymentRejectedCount Int       @default(0) // Hitungan penolakan final Admin Utama
+  paymentRejectReason String?
+  proofRequestReason String?
+  proofDeadline      DateTime?   // Tenggat pengganti saat diminta bukti baru
+  paidAt             DateTime?
+  paymentRecordedById String?
+  paymentRecordedMethod PaymentMethod?
+  methodChangeStatus String      @default("TIDAK_ADA")
+  methodChangeTo     PaymentMethod?
+  methodChangeReason String?
+  methodChangeRequestedAt DateTime?
+  methodChangeDecidedAt DateTime?
+  methodChangeDecidedById String?
+  reminderStep       Int         @default(0) // Anti-duplikasi pengingat 2 jam
+
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @default(now()) @updatedAt
 
@@ -240,26 +263,46 @@ model OrderStatusHistory {
 
 model QrisConfig {
   id            String      @id @default(uuid())
-  imageUrl      String
+  imageUrl      String      // Endpoint aman: /api/qris/gambar/[id]
+  storageName   String      // Nama berkas di penyimpanan privat (tidak diekspos)
   isActive      Boolean
   uploadedById  String
+  replacedById  String?
+  replacedAt    DateTime?
+  keterangan    String?
+  createdAt     DateTime    @default(now())
 
   // FK ke User
   userUserId    String
+
+  @@index([isActive])
 }
 
 // PaymentEvidence: bukti transfer yang diunggah customer (BR-014, BR-015)
 model PaymentEvidence {
   id            String      @id @default(uuid())
-  imageUrl      String
+  imageUrl      String      // Endpoint aman: /api/pembayaran/bukti/[id]
+  storageName   String
   status        String
+  amount        Int         @default(0) // Total transfer yang dibuktikan (untuk multi-order)
+  isLatest      Boolean     @default(true) // Riwayat bukti lama tetap tersimpan
   rejectionCount Int        @default(0)
   initialCheckedById String?
+  initialCheckedAt DateTime?
   finalApprovedById String?
-  uploadedAt    DateTime    @default(now())
+  finalDecisionAt DateTime?
+  rejectionReason String?
+  proofRequestReason String?
+  proofDeadline  DateTime?
+  supersededAt   DateTime?
+  qrisConfigId   String?     // QRIS historis yang dipakai saat transfer
+  uploadedAt     DateTime    @default(now())
+  updatedAt      DateTime    @default(now()) @updatedAt
 
   // FK ke User
   userUserId    String
+
+  @@index([isLatest])
 }
 
 // OrderPaymentAllocation: relasi many-to-many antar Order dan PaymentEvidence (OD-03)
@@ -269,11 +312,63 @@ model OrderPaymentAllocation {
   orderId          String
   paymentEvidenceId String
   allocatedAmount  Int         // Nominal yang dialokasikan ke pesanan ini (total bukti = sum allocations)
+  createdAt        DateTime    @default(now())
 
   // FK ke Order
   orderOrderId   String
   // FK ke PaymentEvidence
   paymentEvidenceUserId String
+
+  @@unique([orderId, paymentEvidenceId])
+  @@index([paymentEvidenceId])
+}
+
+// Riwayat keputusan verifikasi pembayaran (BR-014, append-only secara aplikasi)
+model PaymentVerificationRecord {
+  id           String      @id @default(uuid())
+  orderId      String
+  evidenceId   String
+  stage        String      // PEMERIKSAAN_AWAL | KEPUTUSAN_FINAL | PENGAMBILAN_ALIH | PERMINTAAN_BUKTI_BARU
+  decision     String      // DITERUSKAN | DITOLAK | DISETUJUI | DIMINTA_BARU | DIAMBIL_ALIH
+  actorId      String
+  actorRole    String
+  reason       String?
+  createdAt    DateTime    @default(now())
+
+  @@index([orderId])
+}
+
+// Pengajuan perubahan metode pembayaran — hanya ini yang menjeda timer (BR-016)
+model PaymentMethodChangeRequest {
+  id            String      @id @default(uuid())
+  orderId       String
+  requestedById String
+  fromMethod    PaymentMethod
+  toMethod      PaymentMethod
+  reason        String?
+  status        String      @default("MENUNGGU_PERSETUJUAN")
+  decidedById   String?
+  decidedAt     DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([orderId])
+}
+
+// Pengajuan/keputusan perpanjangan tenggat — TIDAK menjeda timer (BR-016)
+model PaymentDeadlineExtension {
+  id            String      @id @default(uuid())
+  orderId       String
+  requestedById String
+  oldDeadline   DateTime
+  proposedDeadline DateTime
+  approvedDeadline DateTime?
+  reason        String
+  status        String      @default("MENUNGGU_PERSETUJUAN")
+  decidedById   String?
+  decidedAt     DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([orderId])
 }
 
 // ==========================================
