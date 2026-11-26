@@ -1,115 +1,272 @@
 // src/app/api/admin/route.ts
-// API Endpoint Pengelolaan Akun Admin
-// GR-02, BR-005: Otorisasi server-side, Admin Utama tunggal
+// API Endpoint Pengelolaan Akun Admin/Customer
+// GR-02, GR-04, GR-06, BR-005: otorisasi server-side, Admin Utama tunggal, audit append-only.
+// FR-ACC-004, FR-ACC-005, FR-ACC-007: OTP untuk tindakan sensitif & alasan wajib saat menonaktifkan.
 
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
+import {
+  generateOTP,
+  getSessionUser,
+  hashPassword,
+  hashToken,
+  kirimEmailKeTerminal,
+} from '@/lib/auth'
+import { catatAudit } from '@/lib/pembayaranServer'
 
-// GET: Daftar user berdasarkan role
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const role = searchParams.get('role');
+const MASA_BERLAKU_OTP = 5 * 60 * 1000
+const MAKS_GAGAL_OTP = 5
+const AKSI_VALID = [
+  'minta-otp',
+  'disable-user',
+  'enable-user',
+  'create-admin-biasa',
+  'delete-admin-biasa',
+]
 
-  const where: any = {};
-
-  if (role) {
-    where.role = role;
-  }
-
-  const users = await prisma().user.findMany({
-    where,
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isActive: true,
-    },
-  });
-
-  return NextResponse.json({ users });
+function gagal(pesan: string, status: number) {
+  return NextResponse.json({ success: false, error: pesan }, { status })
 }
 
-// POST: Operasi pengelolaan akun
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { action, targetUserId, reason } = body;
+/** OTP sekali pakai untuk pengelolaan akun admin (terpisah dari OTP QRIS/backup). */
+async function konsumsiOtpAdmin(
+  userId: string,
+  otp: string,
+  client: any,
+  sekarang: Date = new Date()
+): Promise<boolean> {
+  const rekaman = await client.otpAndRecoveryToken.findFirst({
+    where: {
+      userId,
+      type: 'OTP_ADMIN',
+      usedAt: null,
+      expiresAt: { gt: sekarang },
+    },
+    orderBy: { expiresAt: 'desc' },
+  })
 
-    if (!action || !['disable-user', 'enable-user', 'create-admin-biasa', 'delete-admin-biasa'].includes(action)) {
-      return NextResponse.json(
-        { success: false, error: 'Aksi tidak valid' },
-        { status: 400 }
-      );
+  if (!rekaman || rekaman.codeHash !== hashToken(String(otp || ''))) {
+    if (rekaman) {
+      const gagalKe = rekaman.failedAttempts + 1
+      await client.otpAndRecoveryToken.update({
+        where: { id: rekaman.id },
+        data: {
+          failedAttempts: gagalKe,
+          ...(gagalKe >= MAKS_GAGAL_OTP ? { usedAt: sekarang } : {}),
+        },
+      })
+    }
+    return false
+  }
+
+  const dikonsumsi = await client.otpAndRecoveryToken.updateMany({
+    where: { id: rekaman.id, usedAt: null },
+    data: { usedAt: sekarang },
+  })
+  return dikonsumsi.count === 1
+}
+
+// GET: daftar user berdasarkan peran — otorisasi server-side (GR-02).
+export async function GET(request: Request) {
+  try {
+    const user = await getSessionUser(request)
+    if (!user) return gagal('Sesi tidak valid. Silakan masuk kembali.', 401)
+    if (user.role !== 'ADMIN_BIASA' && user.role !== 'ADMIN_UTAMA') {
+      return gagal('Hanya admin yang dapat melihat daftar akun', 403)
     }
 
+    const { searchParams } = new URL(request.url)
+    const role = searchParams.get('role')
+    const where: any = {}
+    if (role) where.role = role
+
+    const users = await prisma().user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+      },
+      orderBy: { email: 'asc' },
+    })
+
+    return NextResponse.json({ users })
+  } catch (error) {
+    console.error('API GET /api/admin error:', error)
+    return gagal('Gagal memuat daftar akun', 500)
+  }
+}
+
+// POST: operasi pengelolaan akun — otorisasi server-side (GR-02).
+export async function POST(request: Request) {
+  try {
+    const user = await getSessionUser(request)
+    if (!user) return gagal('Sesi tidak valid. Silakan masuk kembali.', 401)
+    if (user.role !== 'ADMIN_BIASA' && user.role !== 'ADMIN_UTAMA') {
+      return gagal('Hanya admin yang dapat mengelola akun', 403)
+    }
+
+    const body = await request.json().catch(() => null)
+    const action = String(body?.action || '')
+
+    if (!AKSI_VALID.includes(action)) {
+      return gagal('Aksi tidak valid', 400)
+    }
+
+    // Permintaan OTP hanya untuk Admin Utama (FR-ACC-004, FR-ACC-007).
+    if (action === 'minta-otp') {
+      if (user.role !== 'ADMIN_UTAMA') {
+        return gagal('Hanya Admin Utama yang dapat meminta OTP ini', 403)
+      }
+      const sekarang = new Date()
+      const aktif = await prisma().otpAndRecoveryToken.findFirst({
+        where: {
+          userId: user.id,
+          type: 'OTP_ADMIN',
+          usedAt: null,
+          expiresAt: { gt: sekarang },
+        },
+        orderBy: { expiresAt: 'desc' },
+      })
+      if (aktif && aktif.expiresAt.getTime() - sekarang.getTime() > 60_000) {
+        return gagal('OTP masih berlaku. Tunggu maksimal 1 menit sebelum meminta ulang.', 429)
+      }
+
+      const otp = generateOTP()
+      await prisma().otpAndRecoveryToken.create({
+        data: {
+          userId: user.id,
+          userUserId: user.id,
+          codeHash: hashToken(otp),
+          type: 'OTP_ADMIN',
+          failedAttempts: 0,
+          expiresAt: new Date(sekarang.getTime() + MASA_BERLAKU_OTP),
+        },
+      })
+      kirimEmailKeTerminal(
+        user.email,
+        'OTP Pengelolaan Akun Admin Akira Books',
+        `Kode OTP: ${otp}. Berlaku 5 menit. Jangan bagikan kepada pihak lain.`
+      )
+      return NextResponse.json({
+        success: true,
+        pesan: 'OTP dikirim ke terminal server dan berlaku selama 5 menit.',
+      })
+    }
+
+    const otp = String(body?.otp || '')
+    let butuhOtp =
+      action === 'create-admin-biasa' || action === 'delete-admin-biasa'
+
+    // Nonaktifkan/aktifkan Customer: Admin Biasa atau Admin Utama.
+    // Nonaktifkan/aktifkan Admin Biasa: Admin Utama + OTP.
+    const targetUserId = String(body?.targetUserId || '')
+    let targetUser: any = null
+    if (action !== 'create-admin-biasa') {
+      if (!targetUserId) return gagal('targetUserId wajib diisi', 400)
+      targetUser = await prisma().user.findUnique({ where: { id: targetUserId } })
+      if (!targetUser) return gagal('User tidak ditemukan', 404)
+      if (targetUser.role === 'ADMIN_UTAMA') {
+        return gagal('Akun Admin Utama tidak dapat diubah melalui endpoint ini', 403)
+      }
+      if (targetUser.role === 'ADMIN_BIASA') butuhOtp = true
+    }
+
+    if (butuhOtp) {
+      if (user.role !== 'ADMIN_UTAMA') {
+        return gagal('Hanya Admin Utama yang dapat mengelola akun admin', 403)
+      }
+      if (!/^\d{6}$/.test(otp)) {
+        return gagal('OTP 6 digit wajib diisi', 400)
+      }
+      const sah = await prisma().$transaction(async (tx: any) =>
+        konsumsiOtpAdmin(user.id, otp, tx)
+      )
+      if (!sah) return gagal('OTP tidak valid atau sudah kedaluarsa', 401)
+    }
+
+    const reason = String(body?.reason || '').trim()
+
     if (action === 'disable-user' || action === 'enable-user') {
-      if (!targetUserId) {
-        return NextResponse.json(
-          { success: false, error: 'targetUserId wajib diisi' },
-          { status: 400 }
-        );
+      if (action === 'disable-user' && !reason) {
+        return gagal('Alasan penonaktifan wajib diisi', 400)
       }
+      const baruAktif = action === 'enable-user'
 
-      const targetUser = await prisma().user.findUnique({
-        where: { id: targetUserId },
-      });
-
-      if (!targetUser) {
-        return NextResponse.json(
-          { success: false, error: 'User tidak ditemukan' },
-          { status: 404 }
-        );
-      }
-
-      const newIsActive = action === 'enable-user';
-
-      await prisma().user.update({
-        where: { id: targetUserId },
-        data: { isActive: newIsActive, deactivationReason: reason || null },
-      });
+      // FR-ACC-007: sesi aktif langsung dicabut saat akun dinonaktifkan.
+      const hasil = await prisma().$transaction(async (tx: any) => {
+        const diperbarui = await tx.user.update({
+          where: { id: targetUserId },
+          data: {
+            isActive: baruAktif,
+            deactivationReason: baruAktif ? null : reason,
+          },
+        })
+        if (!baruAktif) {
+          await tx.session.deleteMany({ where: { userId: targetUserId } })
+        }
+        await catatAudit({
+          actorId: user.id,
+          actorRole: user.role,
+          action: baruAktif ? 'AKUN_DIAKTIFKAN' : 'NONAKTIFKAN_AKUN',
+          targetEntity: 'User',
+          targetId: targetUserId,
+          oldValue: { isActive: targetUser.isActive },
+          newValue: { isActive: baruAktif, role: targetUser.role },
+          reason: reason || null,
+          client: tx,
+        })
+        return diperbarui
+      })
 
       return NextResponse.json({
         success: true,
-        message: action === 'disable-user' ? 'Akun dinonaktifkan' : 'Akun diaktifkan kembali',
-      });
+        message: baruAktif ? 'Akun diaktifkan kembali' : 'Akun dinonaktifkan',
+        user: { id: hasil.id, isActive: hasil.isActive },
+      })
     }
 
     if (action === 'create-admin-biasa') {
-      const { email, name } = body;
+      const email = String(body?.email || '').trim().toLowerCase()
+      const nama = String(body?.name || '').trim()
+      const password = String(body?.password || '')
 
-      if (!email || !name) {
-        return NextResponse.json(
-          { success: false, error: 'Email dan nama wajib diisi' },
-          { status: 400 }
-        );
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return gagal('Format email tidak valid', 400)
+      }
+      if (!nama) return gagal('Nama wajib diisi', 400)
+      if (password.length < 8) {
+        return gagal('Kata sandi Admin Biasa minimal 8 karakter', 400)
       }
 
-      const existing = await prisma().user.findUnique({
-        where: { email },
-      });
+      const existing = await prisma().user.findUnique({ where: { email } })
+      if (existing) return gagal('Email sudah terdaftar', 409)
 
-      if (existing) {
-        return NextResponse.json(
-          { success: false, error: 'Email sudah terdaftar' },
-          { status: 409 }
-        );
-      }
-
-      const crypto = require('crypto');
-      const salt = crypto.randomBytes(16).toString('hex');
-      const derivedKey = crypto.scryptSync('password', salt, 64, { n: 16384, r: 8, p: 1 });
-      const passwordHash = derivedKey.toString('hex');
-
-      const adminBiasa = await prisma().user.create({
-        data: {
-          email,
-          passwordHash,
-          name,
-          role: 'ADMIN_BIASA',
-          isActive: true,
-        },
-      });
+      const adminBiasa = await prisma().$transaction(async (tx: any) => {
+        const dibuat = await tx.user.create({
+          data: {
+            email,
+            passwordHash: hashPassword(password),
+            name: nama,
+            role: 'ADMIN_BIASA',
+            isActive: true,
+          },
+        })
+        await catatAudit({
+          actorId: user.id,
+          actorRole: user.role,
+          action: 'BUAT_ADMIN',
+          targetEntity: 'User',
+          targetId: dibuat.id,
+          oldValue: {},
+          newValue: { email, name: nama, role: 'ADMIN_BIASA' },
+          reason: reason || 'Pembuatan akun Admin Biasa',
+          client: tx,
+        })
+        return dibuat
+      })
 
       return NextResponse.json({
         success: true,
@@ -120,55 +277,32 @@ export async function POST(request: Request) {
           name: adminBiasa.name,
           role: adminBiasa.role,
         },
-      });
+      })
     }
 
-    if (action === 'delete-admin-biasa') {
-      const { targetUserId } = body;
+    // delete-admin-biasa
+    await prisma().$transaction(async (tx: any) => {
+      await tx.session.deleteMany({ where: { userId: targetUserId } })
+      await tx.user.delete({ where: { id: targetUserId } })
+      await catatAudit({
+        actorId: user.id,
+        actorRole: user.role,
+        action: 'HAPUS_ADMIN',
+        targetEntity: 'User',
+        targetId: targetUserId,
+        oldValue: { email: targetUser.email, role: targetUser.role },
+        newValue: {},
+        reason: reason || 'Pencabutan akun Admin Biasa',
+        client: tx,
+      })
+    })
 
-      if (!targetUserId) {
-        return NextResponse.json(
-          { success: false, error: 'targetUserId wajib diisi' },
-          { status: 400 }
-        );
-      }
-
-      const targetUser = await prisma().user.findUnique({
-        where: { id: targetUserId },
-      });
-
-      if (!targetUser) {
-        return NextResponse.json(
-          { success: false, error: 'User tidak ditemukan' },
-          { status: 404 }
-        );
-      }
-
-      if (targetUser.role === 'ADMIN_UTAMA') {
-        return NextResponse.json(
-          { success: false, error: 'Tidak dapat menghapus Admin Utama' },
-          { status: 403 }
-        );
-      }
-
-      await prisma().user.delete({
-        where: { id: targetUserId },
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: 'Admin Biasa berhasil dicabut',
-      });
-    }
-
-    return NextResponse.json(
-      { success: false, error: 'Aksi tidak dikenali' },
-      { status: 400 }
-    );
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Terjadi kesalahan sistem' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: true,
+      message: 'Admin Biasa berhasil dicabut',
+    })
+  } catch (error: any) {
+    console.error('API POST /api/admin error:', error)
+    return gagal('Terjadi kesalahan sistem', 500)
   }
 }

@@ -35,10 +35,10 @@ export function kirimEmailKeTerminal(to: string, subject: string, body: string) 
 }
 
 /// <summary>
-/// Generate OTP 6 digit
+/// Generate OTP 6 digit dengan sumber acak kriptografis (FR-ACC-004).
 /// </summary>
 export function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  return crypto.randomInt(100000, 1000000).toString()
 }
 
 /// <summary>

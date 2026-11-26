@@ -4,8 +4,8 @@
 | Metadata | Nilai |
 |---|---|
 | Kode Dokumen | AKB-AGT-001 |
-| Versi | 1.3 — Aktif (Tahap 13: Backup, Keamanan & QA Produksi) |
-| Tanggal | 20 November 2026 |
+| Versi | 1.4 — Aktif (Tahap 14: Persiapan Penggunaan / Go-Live Readiness) |
+| Tanggal | 29 November 2026 |
 | Produk | Akira Books — Website Operasional Toko Buku |
 | Target Pembaca | AI Agent (`opencode`), Developer, Pemilik Proyek |
 | Bahasa Dokumen | Bahasa Indonesia |
@@ -26,6 +26,14 @@
 | `plans/00-dokumen_kebutuhan_sistem.md` | AKB-HIST-000 | **Draf Awal / Historis** *(Bukan acuan utama jika bertentangan dengan dokumen `01`–`05`)*[cite: 4] |
 
 > **Larangan Penamaan File:** Dilarang mengubah nama file `plans/04-implementation-plns.md` tanpa izin eksplisit pemilik proyek[cite: 4].
+
+### Dokumentasi Operasional (`docs/`) — Tahap 14
+
+| File Dokumen | Kode | Peran |
+|---|---|---|
+| `docs/panduan-customer.md` | AKB-PND-CUS-001 | Panduan lengkap alur Customer (daftar, katalog, keranjang, checkout, QRIS, jadwal Minggu, pembatalan, refund, notifikasi) |
+| `docs/panduan-admin.md` | AKB-PND-ADM-001 | Panduan Admin Biasa & Admin Utama (buku/modal, Toko Libur, banner, verifikasi 2 tahap, jadwal/no-show, pembatalan/refund, offline/laporan, notifikasi, backup/restore age) |
+| `docs/checklist-go-live.md` | AKB-CHK-GOLIVE-001 | Checklist rotasi kredensial, kunci age & penyimpanan privat, `.env` produksi, verifikasi backup harian, pengujian awal, dan penandatanganan |
 
 ---
 
@@ -100,7 +108,7 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - Unit test Tahap 8 ditambahkan; `tsc --noEmit` 0 error dan `npm test` 16 file / 165 test PASS
   - E2E nyata: QRIS + OTP, multi-order, verifikasi & tolak 2x, jeda timer, auto-cancel/cron, CFD, koreksi, isolasi bukti, dan audit append-only terverifikasi
   - Telah ditinjau dan di-push (commit `0e20547`)
-- Tahap 9: Jadwal dan Pengambilan (implementasi selesai, belum di-commit/di-push)
+- Tahap 9: Jadwal dan Pengambilan (selesai, ditinjau, dan di-push)
   - Migrasi `tahap_9_jadwal_pengambilan` dan `tahap_9_status_sebelumnya` tersinkron; enum `TIDAK_HADIR` dan model `JadwalPerubahan` aktif
   - Customer memilih/ubah Minggu masa depan (tutup 09.00 WIB, tanpa pilihan jam), menyetujui/menolak usulan admin, dan menggabungkan jadwal aktif
   - Admin menyetuju/menolak jadwal (alasan wajib saat tolak), mengusulkan tanggal pengganti tanpa mengubah tanggal aktif sebelum disetujui Customer, menandai no-show, memperpanjang penahanan, dan menekan Selesai
@@ -110,7 +118,7 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - Halaman `/admin/jadwal`, kontrol jadwal di `/pesanan/[id]`, dan tautan Header memakai `@/components/ui` serta 100% Bahasa Indonesia
   - Unit test baru `jadwal-pengambilan.test.ts` (25 test); `tsc --noEmit` 0 error dan `npm test` 17 file / 190 test PASS
   - Telah ditinjau dan di-push (commit `0002298`)
-- Tahap 10: Pembatalan dan Pengembalian Dana/Refund (implementasi selesai, belum di-commit/di-push)
+- Tahap 10: Pembatalan dan Pengembalian Dana/Refund (selesai, ditinjau, dan di-push)
   - Migrasi `tahap_10_pembatalan_refund` tersinkron; `prisma migrate status` up to date (10 migrasi)
   - Customer membatalkan sebelum pembayaran final; Admin Biasa membatalkan sebelum persetujuan final dengan alasan wajib, audit, dan notifikasi
   - Admin Utama dapat membatalkan pesanan lunas; Admin Utama tunggal wajib alasan tambahan dan dicatat di `AdminAuditLog` append-only (GR-06)
@@ -120,7 +128,7 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - Halaman `/admin/pembatalan`, `/admin/refund`, kontrol pembatalan di `/pesanan/[id]`, dan tautan Header memakai `@/components/ui` serta 100% Bahasa Indonesia
   - Perbaikan `src/app/api/admin/route.ts`: memakai `prisma()` dari `@/lib/prisma`, tanpa `require('@prisma/client')`
   - Unit test baru `pembatalan-refund.test.ts` (18 test); `tsc --noEmit` 0 error dan `npm test` 18 file / 208 test PASS; smoke test database nyata terverifikasi
-- Tahap 11: Penjualan Offline dan Laporan Keuangan (implementasi selesai, belum di-commit/di-push)
+- Tahap 11: Penjualan Offline dan Laporan Keuangan (selesai, ditinjau, dan di-push)
   - Migrasi `20261127040000_tahap_11_penjualan_offline_laporan` diterapkan; `prisma migrate deploy` sukses (11 migrasi)
   - Model diperluas: `OfflineSale` (status, catatan, `idempotencyKey` unik), `OfflineSaleItem` (snapshot judul/kode, subtotal) dan `OfflinePriceCorrection` (usul → persetujuan Admin Utama)
   - Pencatatan penjualan booth langsung `SELESAI`; `stockTotal` dikurangi atomik memakai `SELECT ... FOR UPDATE` berurutan per `bookId`; idempotensi anti-duplikat klik
@@ -140,7 +148,7 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - Pengingat 2 jam WIB persisten lintas restart Docker/server, berhenti setelah pembayaran diputuskan, jadwal diputuskan, pesanan dibatalkan/Selesai (BR-025); `instrumentation.ts` mengejar tugas yang jatuh tempo saat startup
   - GR-03: `saringNotifikasiUntukPeran` membuang modal/laba secara rekursif untuk Customer/Admin Biasa sebelum payload dikirim
   - Unit test baru: `notifikasi-grouping.test.ts`, `notifikasi-mark-read.test.ts`, `notifikasi-outbox.test.ts`, `notifikasi-pengingat.test.ts`; `tsc --noEmit` 0 error dan `npm test` 26 file / 234 test PASS
-- Tahap 13: Backup, Keamanan, dan Pengujian Menyeluruh (implementasi selesai, belum di-commit/di-push)
+- Tahap 13: Backup, Keamanan, dan Pengujian Menyeluruh (selesai, ditinjau, dan di-push)
   - Migrasi `20261129040000_tahap_13_backup_keamanan` diterapkan; model `BackupArsip` menyimpan riwayat, checksum SHA-256, status, dan penanda retensi; `prisma migrate status` up to date (13 migrasi)
   - Backup harian otomatis (default 02.00 WIB, sekali per hari WIB) + backup manual Admin Utama; dump PostgreSQL (`pg_dump`) dan seluruh direktori media dikemas `tar.gz`, lalu dienkripsi `age` dengan kunci publik dari environment (kunci privat tidak pernah masuk repositori/image)
   - Retensi 30 hari: arsip lama dihapus otomatis, riwayat tetap ada dengan status `DIHAPUS`, dan setiap penghapusan tercatat di `AdminAuditLog` append-only (GR-06)
@@ -151,18 +159,27 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - `.env.example` diperbarui tanpa nilai rahasia; `.gitignore` melindungi `backup-arsip/`, `storage/`, `*.age`, dan kunci privat
   - Unit test baru: `backup-enkripsi.test.ts`, `backup-retensi.test.ts`, `backup-isolasi.test.ts`; `tsc --noEmit` 0 error, `npm test` 29 file / 248 test PASS, dan `npm run build` sukses (55 halaman)
 
+- Tahap 14: Persiapan Penggunaan (`Go-Live Readiness`) — **100% Siap Tinjauan Go-Live**
+  - Audit akhir doc-vs-code: fitur inti, OD-01 s.d. OD-04, GR-03/GR-06, zona waktu WIB, cookie/OTP/rate-limit, dan perlindungan media/backup
+  - Perbaikan celah keamanan hasil audit: `/api/admin/route.ts` kini mewajibkan sesi & peran server-side, OTP `OTP_ADMIN`, kata sandi hasil input dengan `hashPassword`, pencabutan sesi, dan audit (sebelumnya tanpa autorisasi & memakai kata sandi hardcoded `password`)
+  - Perbaikan kecil lainnya: OTP memakai `crypto.randomInt` (bukan `Math.random`); `toWIBString` tidak lagi menambah +7 jam dua kali; `dapatkanRiwayatAudit` memakai `actorRoleSnapshot`; endpoint baca audit `/api/admin/audit` hanya Admin Utama (GR-06)
+  - Catatan audit: OD-02 (merge buku duplikat) belum diimplementasikan di aplikasi—kolom `mergedIntoBookId` sudah ada; diserahkan ke keputusan pemilik proyek sebelum go-live penuh
+  - Dokumentasi operasional baru (100% Bahasa Indonesia): `docs/panduan-customer.md`, `docs/panduan-admin.md`, `docs/checklist-go-live.md`
+  - `README.md` diperbarui dari templat Next.js menjadi panduan proyek lengkap dengan status go-live dan tautan dokumentasi
+  - `checklist-go-live.md` memuat rotasi kredensial default, kunci age & penyimpanan privat terpisah, `.env` produksi, verifikasi backup harian, pengujian awal, dan penandatanganan pemilik proyek
+  - Catatan untuk peninjauan: pemulihan kata sandi mandiri (`/forgot-password`) masih berupa abstraksi dan perlu keputusan pemilik proyek sebelum produksi penuh
+  - Gerbang verifikasi dijalankan: `prisma migrate status` up to date (13 migrasi), `tsc --noEmit` 0 error, `npm test` 31 file / 259 test PASS (termasuk 11 test regresi keamanan baru), dan `npm run build` sukses (56 halaman)
+
 ### Active
-- Tahap 13 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
+- Tahap 14 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
 
 ### Blocked
 - (none)
 
 ## 5. Implementasi Tahap Selanjutnya
 
-- **Tahap 9**: Selesai, ditinjau, dan di-push (commit `0002298`)
-- **Tahap 10**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
-- **Tahap 11**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
-- **Tahap 12**: Selesai, ditinjau, dan di-push
-- **Tahap 13**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
+- **Tahap 1 s.d. Tahap 13**: Selesai, ditinjau, dan di-push sesuai konfirmasi pemilik proyek
+- **Tahap 14**: Implementasi & dokumentasi selesai dan terverifikasi; **100% Siap Tinjauan Go-Live** — menunggu peninjauan pemilik proyek (GR-07)
+- **Tahap berikutnya setelah peninjauan**: penandatanganan `docs/checklist-go-live.md`, rotasi kredensial produksi, lalu `git commit` / `git push` jika disetujui
 
-Today's date: Mon Nov 23 2026
+Today's date: 29 November 2026

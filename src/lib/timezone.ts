@@ -20,10 +20,12 @@ export function toWIB(date: Date | string | null | undefined): Date {
   return wib;
 }
 
-// Fungkonversi tanggal ke string WIB
+// Format tanggal ke string WIB.
+// Catatan: jangan menggeser dengan toWIB() sebelum memformat dengan timeZone Asia/Jakarta,
+// karena akan terjadi penambahan +7 jam dua kali.
 export function toWIBString(date: Date | string | null | undefined): string {
-  const wibDate = toWIB(date);
-  return wibDate.toLocaleString('id-ID', {
+  const d = date ? new Date(date) : new Date();
+  return d.toLocaleString('id-ID', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',

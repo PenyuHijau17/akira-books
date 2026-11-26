@@ -134,7 +134,7 @@ export const dapatkanRiwayatAudit = async (prisma: any, opsi: {
 
   if (opsi.targetEntity) where.targetEntity = opsi.targetEntity;
   if (opsi.targetId) where.targetId = opsi.targetId;
-  if (opsi.actorRole) where.actorRole = opsi.actorRole;
+  if (opsi.actorRole) where.actorRoleSnapshot = opsi.actorRole;
 
   // Filter rentang waktu jika ada
   if (opsi.awal || opsi.akhir) {
