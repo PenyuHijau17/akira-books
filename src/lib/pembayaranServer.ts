@@ -172,7 +172,7 @@ export async function notifikasiAdmins(params: {
 
 export async function buatReminder(params: {
   orderId: string
-  type: 'PENGINGAT_BUKTI' | 'PENGINGAT_PUTUSAN'
+  type: 'PENGINGAT_BUKTI' | 'PENGINGAT_PUTUSAN' | 'PENGINGAT_JADWAL'
   jam?: number
   client?: any
 }) {
@@ -191,7 +191,7 @@ export async function buatReminder(params: {
 
 export async function selesaikanReminder(params: {
   orderId: string
-  types: Array<'PENGINGAT_BUKTI' | 'PENGINGAT_PUTUSAN'>
+  types: Array<'PENGINGAT_BUKTI' | 'PENGINGAT_PUTUSAN' | 'PENGINGAT_JADWAL'>
   client?: any
 }) {
   const client = params.client ?? prisma()

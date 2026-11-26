@@ -6,6 +6,11 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { saringFieldModal } from '@/lib/pesanan'
+import { daftarTanggalMinggu } from '@/lib/jadwal'
+import {
+  anggotaGrupJadwal,
+  riwayatJadwalLengkap,
+} from '@/lib/jadwalServer'
 
 export async function GET(
   request: Request,
@@ -30,6 +35,12 @@ export async function GET(
         refundStatus: true,
         paymentMethod: true,
         pickupSundayDate: true,
+        pickupGroupId: true,
+        noShowAt: true,
+        noShowHoldDeadline: true,
+        noShowReason: true,
+        noShowCount: true,
+        completedAt: true,
         paymentDeadline: true,
         paymentReviewStatus: true,
         paymentRejectedCount: true,
@@ -91,7 +102,7 @@ export async function GET(
         })
       : []
 
-    const [perubahanMetode, perpanjangan] = await Promise.all([
+    const [perubahanMetode, perpanjangan, riwayatJadwal, anggotaGabungan] = await Promise.all([
       prisma().paymentMethodChangeRequest.findMany({
         where: { orderId: pesanan.id },
         orderBy: { createdAt: 'desc' },
@@ -102,6 +113,8 @@ export async function GET(
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
+      riwayatJadwalLengkap(prisma(), pesanan.id),
+      anggotaGrupJadwal(prisma(), pesanan),
     ])
 
     return NextResponse.json({
@@ -112,7 +125,11 @@ export async function GET(
         alokasi,
         perubahanMetode,
         perpanjangan,
+        riwayatJadwal,
+        anggotaGabungan,
       }),
+      usulanJadwalTertunda: riwayatJadwal.find((u) => u.status === 'MENUNGGU_PERSETUJUAN') || null,
+      daftarMinggu: daftarTanggalMinggu(),
     })
   } catch (error: any) {
     console.error('API GET /api/pesanan/[id] error:', error)

@@ -99,15 +99,26 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - Halaman `/admin/qris`, `/admin/pembayaran`, dan `/pesanan/[id]` memakai `@/components/ui` dan 100% Bahasa Indonesia
   - Unit test Tahap 8 ditambahkan; `tsc --noEmit` 0 error dan `npm test` 16 file / 165 test PASS
   - E2E nyata: QRIS + OTP, multi-order, verifikasi & tolak 2x, jeda timer, auto-cancel/cron, CFD, koreksi, isolasi bukti, dan audit append-only terverifikasi
+  - Telah ditinjau dan di-push (commit `0e20547`)
+- Tahap 9: Jadwal dan Pengambilan (implementasi selesai, belum di-commit/di-push)
+  - Migrasi `tahap_9_jadwal_pengambilan` dan `tahap_9_status_sebelumnya` tersinkron; enum `TIDAK_HADIR` dan model `JadwalPerubahan` aktif
+  - Customer memilih/ubah Minggu masa depan (tutup 09.00 WIB, tanpa pilihan jam), menyetujui/menolak usulan admin, dan menggabungkan jadwal aktif
+  - Admin menyetuju/menolak jadwal (alasan wajib saat tolak), mengusulkan tanggal pengganti tanpa mengubah tanggal aktif sebelum disetujui Customer, menandai no-show, memperpanjang penahanan, dan menekan Selesai
+  - No-show setelah 09.00 WIB menahan buku 24 jam + alasan, tanpa auto-cancel; jadwal ulang/batal tetap manual
+  - Tombol Selesai menurunkan `stockTotal` dan `stockReserved` atomik (`SELECT ... FOR UPDATE`, validasi all-or-nothing) lalu mengunci `SELESAI` dan mencatat waktu serah terima
+  - OD-01 dipertahankan: pembayaran final lebih dulu → `SUDAH_DIBAYAR`, lalu jadwal disetujui → `MENUNGGU_DIAMBIL`
+  - Halaman `/admin/jadwal`, kontrol jadwal di `/pesanan/[id]`, dan tautan Header memakai `@/components/ui` serta 100% Bahasa Indonesia
+  - Unit test baru `jadwal-pengambilan.test.ts` (25 test); `tsc --noEmit` 0 error dan `npm test` 17 file / 190 test PASS
 
 ### Active
-- Tahap 8 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
+- Tahap 9 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
 
 ### Blocked
 - (none)
 
 ## 5. Implementasi Tahap Selanjutnya
 
-- **Tahap 9**: Menunggu peninjauan Tahap 8 oleh pemilik proyek (GR-07)
+- **Tahap 9**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
+- **Tahap 10**: Menunggu arahan pemilik proyek setelah Tahap 9 disetujui
 
 Today's date: Mon Nov 23 2026

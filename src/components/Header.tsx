@@ -68,6 +68,7 @@ export default function Header() {
 
           {adalahAdmin && <a href="/admin/buku">Kelola Buku</a>}
           {adalahAdmin && <a href="/admin/pembayaran">Verifikasi Bayar</a>}
+          {adalahAdmin && <a href="/admin/jadwal">Jadwal Pengambilan</a>}
           {user?.role === "ADMIN_UTAMA" && <a href="/admin/qris">QRIS Toko</a>}
           {adalahAdmin && <a href="/admin/banner">Banner Promo</a>}
 

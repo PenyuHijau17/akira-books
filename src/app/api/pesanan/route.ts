@@ -26,6 +26,8 @@ export async function GET(request: Request) {
         refundStatus: true,
         paymentMethod: true,
         pickupSundayDate: true,
+        pickupGroupId: true,
+        noShowHoldDeadline: true,
         paymentDeadline: true,
         totalAmount: true,
         createdAt: true,

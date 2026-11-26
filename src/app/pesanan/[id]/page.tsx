@@ -46,6 +46,35 @@ type PesananLain = {
   id: string
   orderNumber: string
   totalAmount: number
+  orderStatus?: string
+  pickupStatus?: string
+  pickupGroupId?: string | null
+  pickupSundayDate?: string
+}
+
+type UsulanJadwal = {
+  id: string
+  jenis: string
+  pengajuId: string
+  peranPengaju: string
+  tanggalLama: string
+  tanggalBaru: string
+  status: string
+  statusSebelumnya: string | null
+  alasan: string | null
+  alasanKeputusan: string | null
+  createdAt: string
+}
+
+type AnggotaGabungan = {
+  id: string
+  orderNumber: string
+  customerId: string
+  orderStatus: string
+  paymentProofStatus: string
+  pickupStatus: string
+  pickupSundayDate: string
+  totalAmount: number
 }
 
 type Pesanan = {
@@ -62,6 +91,12 @@ type Pesanan = {
   refundStatus: string
   paymentMethod: string
   pickupSundayDate: string
+  pickupGroupId: string | null
+  noShowAt: string | null
+  noShowHoldDeadline: string | null
+  noShowReason: string | null
+  noShowCount: number
+  completedAt: string | null
   paymentDeadline: string
   methodChangeStatus: string
   methodChangeTo: string | null
@@ -76,6 +111,8 @@ type Pesanan = {
   riwayatBukti: Bukti[]
   perubahanMetode: Array<{ id: string; toMethod: string; status: string; createdAt: string }>
   perpanjangan: Array<{ id: string; proposedDeadline: string; status: string; reason: string }>
+  riwayatJadwal: UsulanJadwal[]
+  anggotaGabungan: AnggotaGabungan[]
 }
 
 type QrisAktif = { id: string; imageUrl: string; keterangan: string | null; pesan: string }
@@ -92,6 +129,15 @@ const tanggalLengkap = (nilai: string) =>
     timeZone: 'Asia/Jakarta',
     dateStyle: 'full',
     timeStyle: 'short',
+  })
+
+const tanggalMingguPendek = (nilai: string) =>
+  new Date(nilai).toLocaleDateString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   })
 
 function formatSisa(detik: number): string {
@@ -120,6 +166,12 @@ export default function HalamanDetailPesanan({
   const [alasanMetode, setAlasanMetode] = useState('')
   const [jamTambahan, setJamTambahan] = useState('24')
   const [alasanTenggat, setAlasanTenggat] = useState('')
+  const [daftarMinggu, setDaftarMinggu] = useState<string[]>([])
+  const [tanggalJadwal, setTanggalJadwal] = useState('')
+  const [alasanJadwal, setAlasanJadwal] = useState('')
+  const [usulanTertunda, setUsulanTertunda] = useState<UsulanJadwal | null>(null)
+  const [calonGabungan, setCalonGabungan] = useState<PesananLain[]>([])
+  const [grupTerpilih, setGrupTerpilih] = useState<string[]>([])
   const [detikSekarang, setDetikSekarang] = useState(0)
   const [sedangMemproses, setSedangMemproses] = useState(false)
   const [memuat, setMemuat] = useState(true)
@@ -151,16 +203,33 @@ export default function HalamanDetailPesanan({
       setPesanan(detail)
       setDaftarTerpilih([detail.id])
       setTotalTransfer(String(detail.totalAmount))
+      setUsulanTertunda(data.usulanJadwalTertunda || null)
+      const minggu: string[] = data.daftarMinggu || []
+      setDaftarMinggu(minggu)
+      setTanggalJadwal((sebelumnya) =>
+        minggu.includes(sebelumnya) ? sebelumnya : minggu[0] || ''
+      )
+      setGrupTerpilih([
+        detail.id,
+        ...(detail.anggotaGabungan || []).map((a) => a.id),
+      ])
 
       if (resDaftar.ok) {
         const daftar = await resDaftar.json()
+        const semua: PesananLain[] = daftar.pesanan || []
         setPesananLain(
-          (daftar.pesanan || [])
+          semua
             .filter(
-              (p: PesananLain & { orderStatus: string }) =>
+              (p: PesananLain) =>
                 p.id !== detail.id && p.orderStatus === 'MENUNGGU_PEMBAYARAN'
             )
             .map((p: PesananLain) => ({ id: p.id, orderNumber: p.orderNumber, totalAmount: p.totalAmount }))
+        )
+        setCalonGabungan(
+          semua.filter(
+            (p: PesananLain) =>
+              p.id !== detail.id && !['SELESAI', 'DIBATALKAN'].includes(p.orderStatus || '')
+          )
         )
       }
     } catch (error: any) {
@@ -311,6 +380,112 @@ export default function HalamanDetailPesanan({
     )
   }
 
+  function gantiGrup(id: string, dicentang: boolean) {
+    setGrupTerpilih((sebelumnya) =>
+      dicentang
+        ? [...new Set([...sebelumnya, id])]
+        : sebelumnya.filter((nilai) => nilai !== id)
+    )
+  }
+
+  async function kirimJadwal(aksi: string, butuhAlasan: boolean = false) {
+    if (!pesanan) return
+    if (!tanggalJadwal) {
+      setPesanError('Pilih tanggal Minggu terlebih dahulu')
+      return
+    }
+    if (butuhAlasan && alasanJadwal.trim().length < 3) {
+      setPesanError('Alasan wajib diisi minimal 3 karakter')
+      return
+    }
+    setSedangMemproses(true)
+    setPesanError(null)
+    setPesanSukses(null)
+    try {
+      const res = await fetch('/api/jadwal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: aksi,
+          orderId: pesanan.id,
+          pickupSundayDate: tanggalJadwal,
+          alasan: alasanJadwal,
+        }),
+      })
+      const isi = await res.json()
+      if (!res.ok) throw new Error(isi?.error || 'Pengajuan jadwal gagal')
+      setPesanSukses(isi.pesan || 'Jadwal berhasil diproses.')
+      setAlasanJadwal('')
+      await muat()
+    } catch (error: any) {
+      setPesanError(error?.message || 'Pengajuan jadwal gagal')
+    } finally {
+      setSedangMemproses(false)
+    }
+  }
+
+  async function kirimKeputusanUsulan(aksi: 'SETUJU_USULAN' | 'TOLAK_USULAN') {
+    if (!pesanan) return
+    if (aksi === 'TOLAK_USULAN' && alasanJadwal.trim().length < 3) {
+      setPesanError('Alasan penolakan wajib diisi minimal 3 karakter')
+      return
+    }
+    setSedangMemproses(true)
+    setPesanError(null)
+    setPesanSukses(null)
+    try {
+      const res = await fetch('/api/jadwal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: aksi, orderId: pesanan.id, alasan: alasanJadwal }),
+      })
+      const isi = await res.json()
+      if (!res.ok) throw new Error(isi?.error || 'Keputusan usulan gagal')
+      setPesanSukses(isi.pesan || 'Keputusan usulan berhasil dicatat.')
+      setAlasanJadwal('')
+      await muat()
+    } catch (error: any) {
+      setPesanError(error?.message || 'Keputusan usulan gagal')
+    } finally {
+      setSedangMemproses(false)
+    }
+  }
+
+  async function gabungkanJadwal() {
+    if (!pesanan) return
+    if (grupTerpilih.length < 2 || !tanggalJadwal) {
+      setPesanError('Pilih minimal dua pesanan dan tanggal Minggu bersama')
+      return
+    }
+    setSedangMemproses(true)
+    setPesanError(null)
+    setPesanSukses(null)
+    try {
+      const res = await fetch('/api/jadwal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'GABUNG',
+          orderIds: grupTerpilih,
+          pickupSundayDate: tanggalJadwal,
+          alasan: alasanJadwal,
+        }),
+      })
+      const isi = await res.json()
+      if (!res.ok) throw new Error(isi?.error || 'Penggabungan jadwal gagal')
+      setPesanSukses('Jadwal berhasil digabungkan dan menunggu tinjauan admin.')
+      await muat()
+    } catch (error: any) {
+      setPesanError(error?.message || 'Penggabungan jadwal gagal')
+    } finally {
+      setSedangMemproses(false)
+    }
+  }
+
+  async function lepaskanJadwal() {
+    await kirimJadwal('LEPAS_GABUNGAN')
+  }
+
   useEffect(() => {
     if (!daftarTerpilih.length || !pesanan) return
     const nilai = daftarTerpilih.reduce((jumlah: number, id) => {
@@ -408,6 +583,189 @@ export default function HalamanDetailPesanan({
                 </div>
               )}
               <div>Dibuat: {tanggalLengkap(pesanan.createdAt)} WIB</div>
+            </CardContent>
+          </Card>
+
+          <Card style={{ marginBottom: '1rem' }}>
+            <CardHeader
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+              }}
+            >
+              <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#4d372d' }}>
+                Jadwal Pengambilan Minggu
+              </h2>
+              <Badge variant="warning">{labelStatusJadwal(pesanan.pickupStatus)}</Badge>
+            </CardHeader>
+            <CardContent style={{ display: 'grid', gap: '0.85rem' }}>
+              <div style={{ color: '#5d4037' }}>
+                Tanggal aktif: {tanggalMingguPendek(pesanan.pickupSundayDate)} · tutup pukul 09.00 WIB
+              </div>
+              {pesanan.pickupGroupId && (
+                <div style={{ color: '#5d4037' }}>
+                  Jadwal gabungan dengan:{' '}
+                  {pesanan.anggotaGabungan
+                    .filter((a) => a.id !== pesanan.id)
+                    .map((a) => a.orderNumber)
+                    .join(', ') || 'pesanan lainnya'}
+                </div>
+              )}
+              {pesanan.completedAt && (
+                <AlertBanner
+                  type="success"
+                  title="Pesanan selesai"
+                  description={`Buku diserahkan pada ${tanggalLengkap(pesanan.completedAt)} WIB.`}
+                />
+              )}
+              {pesanan.noShowAt && (
+                <AlertBanner
+                  type="warning"
+                  title="Tidak hadir pada jadwal"
+                  description={
+                    (pesanan.noShowReason || 'Customer tidak hadir sebelum pukul 09.00 WIB.') +
+                    (pesanan.noShowHoldDeadline
+                      ? ` Buku ditahan sampai ${tanggalLengkap(pesanan.noShowHoldDeadline)} WIB.`
+                      : '') +
+                    ' Tidak ada pembatalan otomatis. Hubungi admin atau ajukan jadwal baru.'
+                  }
+                />
+              )}
+
+              {usulanTertunda?.jenis === 'USULAN_ADMIN' && (
+                <AlertBanner
+                  type="info"
+                  title="Admin mengusulkan jadwal baru"
+                  description={
+                    `Tanggal usulan: ${tanggalMingguPendek(usulanTertunda.tanggalBaru)}. ` +
+                    `Alasan: ${usulanTertunda.alasan || '-'}. ` +
+                    'Jadwal lama tetap berlaku sampai Anda menyetujui.'
+                  }
+                />
+              )}
+
+              <Input
+                as="select"
+                label="Pilih tanggal Minggu di masa depan"
+                value={tanggalJadwal}
+                onChange={(e) => setTanggalJadwal(e.target.value)}
+                options={daftarMinggu.map((m) => ({ value: m, label: tanggalMingguPendek(m) }))}
+                helperText="Waktu pengambilan tetap pukul 09.00 WIB, tanpa pilihan jam."
+              />
+              <Input
+                as="textarea"
+                label="Alasan (wajib untuk ubah jadwal atau penolakan usulan)"
+                rows={2}
+                value={alasanJadwal}
+                onChange={(e) => setAlasanJadwal(e.target.value)}
+              />
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {usulanTertunda?.jenis === 'USULAN_ADMIN' ? (
+                  <>
+                    <Button
+                      onClick={() => kirimKeputusanUsulan('SETUJU_USULAN')}
+                      isLoading={sedangMemproses}
+                    >
+                      Setujui Usulan Admin
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => kirimKeputusanUsulan('TOLAK_USULAN')}
+                      isLoading={sedangMemproses}
+                    >
+                      Tolak Usulan Admin
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {['MENUNGGU_KONFIRMASI', 'PERLU_TANGGAL_BARU'].includes(
+                      pesanan.pickupStatus
+                    ) && (
+                      <Button onClick={() => kirimJadwal('PILIH_TANGGAL')} isLoading={sedangMemproses}>
+                        Ajukan Tanggal Ini
+                      </Button>
+                    )}
+                    {['DISETUJUI', 'TIDAK_HADIR', 'PERUBAHAN_MENUNGGU_PERSETUJUAN'].includes(
+                      pesanan.pickupStatus
+                    ) && (
+                      <Button
+                        onClick={() => kirimJadwal('AJUKAN_UBAH', true)}
+                        isLoading={sedangMemproses}
+                      >
+                        Ajukan Ubah Jadwal
+                      </Button>
+                    )}
+                    {pesanan.pickupStatus === 'MENUNGGU_KONFIRMASI' && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => kirimJadwal('BATAL_PENGAJUAN')}
+                        isLoading={sedangMemproses}
+                      >
+                        Batalkan Pengajuan
+                      </Button>
+                    )}
+                    {usulanTertunda?.jenis === 'PENGAJUAN_CUSTOMER' && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => kirimJadwal('BATAL_USULAN_SAYA')}
+                        isLoading={sedangMemproses}
+                      >
+                        Batalkan Usulan Saya
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {calonGabungan.length > 0 && (
+                <div style={{ borderTop: '1px solid #d7ccc8', paddingTop: '0.85rem' }}>
+                  <div style={{ color: '#5d4037', marginBottom: '0.4rem' }}>
+                    Gabungkan pesanan aktif lainnya ke tanggal yang sama (status pembayaran, nominal,
+                    dan riwayat tetap terpisah):
+                  </div>
+                  {calonGabungan.map((item) => (
+                    <label key={item.id} style={{ display: 'block', color: '#4d372d' }}>
+                      <input
+                        type="checkbox"
+                        checked={grupTerpilih.includes(item.id)}
+                        onChange={(e) => gantiGrup(item.id, e.target.checked)}
+                      />{' '}
+                      {item.orderNumber} — {rupiah(item.totalAmount)}
+                    </label>
+                  ))}
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.6rem' }}>
+                    <Button onClick={gabungkanJadwal} isLoading={sedangMemproses}>
+                      Gabungkan Jadwal
+                    </Button>
+                    {pesanan.pickupGroupId && (
+                      <Button
+                        variant="secondary"
+                        onClick={lepaskanJadwal}
+                        isLoading={sedangMemproses}
+                      >
+                        Lepas dari Jadwal Gabungan
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {pesanan.riwayatJadwal.length > 0 && (
+                <div style={{ borderTop: '1px solid #d7ccc8', paddingTop: '0.85rem' }}>
+                  <strong style={{ color: '#4d372d' }}>Riwayat Pengajuan Jadwal</strong>
+                  {pesanan.riwayatJadwal.map((usulan) => (
+                    <div key={usulan.id} style={{ color: '#5d4037', fontSize: '0.9rem' }}>
+                      {tanggalLengkap(usulan.createdAt)} WIB ·{' '}
+                      {usulan.jenis === 'USULAN_ADMIN' ? 'Usulan admin' : 'Pengajuan sendiri'}:{' '}
+                      {tanggalMingguPendek(usulan.tanggalBaru)} · {usulan.status}
+                      {usulan.alasan ? ` · ${usulan.alasan}` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

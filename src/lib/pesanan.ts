@@ -255,6 +255,7 @@ const LABEL_STATUS_JADWAL: Record<string, string> = {
   DISETUJUI: 'Disetujui',
   PERLU_TANGGAL_BARU: 'Perlu Tanggal Baru',
   PERUBAHAN_MENUNGGU_PERSETUJUAN: 'Perubahan Jadwal Menunggu Persetujuan',
+  TIDAK_HADIR: 'Tidak Hadir (No-Show)',
 }
 
 const LABEL_STATUS_BUKTI: Record<string, string> = {

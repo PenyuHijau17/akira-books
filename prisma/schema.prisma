@@ -213,6 +213,15 @@ model Order {
   methodChangeDecidedById String?
   reminderStep       Int         @default(0) // Anti-duplikasi pengingat 2 jam
 
+  // ===== Tahap 9: Jadwal, no-show, dan penyerahan fisik =====
+  noShowAt           DateTime?   // WIB 09.00 lewat tanpa pengambilan (BR-019)
+  noShowHoldDeadline DateTime?   // Tenggat penahanan buku setelah no-show (tanpa auto-cancel)
+  noShowReason       String?     // Alasan penahanan terakhir
+  noShowCount        Int         @default(0)
+  completedAt        DateTime?   // Waktu serah terima buku secara fisik (FR-DONE-001)
+  completedById      String?     // Admin yang menekan tombol Selesai
+  stockSold          Boolean     @default(false) // Idempotensi pengurangan stok saat Selesai
+
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @default(now()) @updatedAt
 
@@ -371,6 +380,29 @@ model PaymentDeadlineExtension {
   @@index([orderId])
 }
 
+// Riwayat pengajuan/usulan perubahan jadwal (Tahap 9, FR-PICK-001)
+// Tanggal aktif pada Order sengaja tidak diubah sampai pihak lawan menyetujui (AC-PICK-001).
+model JadwalPerubahan {
+  id              String      @id @default(uuid())
+  orderId         String
+  jenis           String      // PENGAJUAN_CUSTOMER | USULAN_ADMIN
+  pengajuId       String
+  peranPengaju    String      // CUSTOMER | ADMIN_BIASA | ADMIN_UTAMA
+  tanggalLama     DateTime
+  tanggalBaru     DateTime    // Selalu pukul 09.00 WIB
+  statusSebelumnya String?    // Dipakai saat pengaju membatalkan usulannya sendiri
+  alasan          String?
+  status          String      @default("MENUNGGU_PERSETUJUAN")
+  // MENUNGGU_PERSETUJUAN | DISETUJUI | DITOLAK | DIBATALKAN
+  diputuskanOleh  String?
+  diputuskanPeran String?
+  alasanKeputusan String?
+  diputuskanPada  DateTime?
+  createdAt       DateTime    @default(now())
+
+  @@index([orderId, status])
+}
+
 // ==========================================
 // 5. REFUND & PENJUALAN OFFLINE
 // ==========================================
@@ -526,6 +558,7 @@ enum PickupStatus {
   DISETUJUI
   PERLU_TANGGAL_BARU
   PERUBAHAN_MENUNGGU_PERSETUJUAN
+  TIDAK_HADIR
 }
 
 enum RefundStatus {

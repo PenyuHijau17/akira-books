@@ -4,6 +4,12 @@
 
 import prisma from '@/lib/prisma'
 import { bolehAutoCancel } from '@/lib/pembayaran'
+import { penilaianNoShow } from '@/lib/jadwal'
+import {
+  notifikasiAdminJadwal,
+  notifikasiJadwal,
+  selesaikanPengingatJadwal,
+} from '@/lib/jadwalServer'
 import {
   buatNotifikasi,
   catatAudit,
@@ -192,6 +198,106 @@ export async function jalankanAutoCancel(sekarang: Date = new Date()): Promise<n
   return dibatalkan
 }
 
+/**
+ * No-show (BR-019): lewat 09.00 WIB tanpa serah terima → tandai TIDAK_HADIR dan tahan buku
+ * dengan tenggat baru + alasan. TIDAK ada auto-cancel; keputusan lanjutan tetap manual.
+ */
+export async function jalankanNoShow(sekarang: Date = new Date()): Promise<number> {
+  const client = prisma()
+  const kandidat = await client.order.findMany({
+    where: {
+      pickupStatus: 'DISETUJUI',
+      orderStatus: { in: ['MENUNGGU_DIAMBIL', 'SUDAH_DIBAYAR'] },
+      pickupSundayDate: { lt: sekarang },
+      stockSold: false,
+      noShowAt: null,
+    },
+    select: {
+      id: true,
+      orderNumber: true,
+      orderStatus: true,
+      pickupStatus: true,
+      pickupSundayDate: true,
+      stockSold: true,
+      noShowAt: true,
+      customerId: true,
+    },
+    take: 100,
+  })
+
+  let ditandai = 0
+  for (const k of kandidat) {
+    const berhasil = await client.$transaction(
+      async (tx: any) => {
+        const terkunci = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM "Order" WHERE id = ${k.id} FOR UPDATE
+        `
+        if (terkunci.length === 0) return false
+        const order = await tx.order.findUnique({ where: { id: k.id } })
+        if (!order) return false
+
+        const penilaian = penilaianNoShow({
+          pickupStatus: order.pickupStatus,
+          orderStatus: order.orderStatus,
+          stockSold: order.stockSold,
+          pickupSundayDate: order.pickupSundayDate,
+          sekarang,
+          sudahDicatat: !!order.noShowAt,
+        })
+        if (!penilaian.harus || !penilaian.batasTahan || !penilaian.alasan) return false
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            pickupStatus: 'TIDAK_HADIR',
+            noShowAt: sekarang,
+            noShowHoldDeadline: penilaian.batasTahan,
+            noShowReason: penilaian.alasan,
+            noShowCount: { increment: 1 },
+          },
+        })
+        await catatRiwayatStatus({
+          orderId: order.id,
+          domain: 'PICKUP',
+          oldStatus: order.pickupStatus,
+          newStatus: 'TIDAK_HADIR',
+          reason: penilaian.alasan,
+          actorId: 'SYSTEM',
+          actorRole: 'SYSTEM',
+          client: tx,
+        })
+        await catatAudit({
+          actorId: 'SYSTEM',
+          actorRole: 'SYSTEM',
+          action: 'SISTEM_TANDAI_NO_SHOW',
+          targetEntity: 'Order',
+          targetId: order.id,
+          oldValue: { pickupStatus: order.pickupStatus },
+          newValue: { pickupStatus: 'TIDAK_HADIR', noShowHoldDeadline: penilaian.batasTahan },
+          reason: penilaian.alasan,
+          client: tx,
+        })
+        await selesaikanPengingatJadwal(tx, order.id)
+        await notifikasiAdminJadwal(
+          tx,
+          `jadwal:no-show:${order.id}:${sekarang.getTime()}`,
+          `No-show: customer tidak mengambil pesanan ${order.orderNumber} sebelum pukul 09.00 WIB. Buku ditahan sampai ${penilaian.batasTahan.toISOString()}. Tidak ada auto-cancel.`
+        )
+        await notifikasiJadwal(
+          tx,
+          order.customerId,
+          `jadwal:no-show:${order.id}:${sekarang.getTime()}`,
+          `Anda tidak hadir pada jadwal pesanan ${order.orderNumber}. Buku ditahan sementara; hubungi admin untuk mengubah jadwal atau membatalkan.`
+        )
+        return true
+      },
+      { maxWait: 20000, timeout: 30000, isolationLevel: 'Serializable' }
+    )
+    if (berhasil) ditandai += 1
+  }
+  return ditandai
+}
+
 /** Pengingat 2 jam: anti-duplikasi via groupKey dan tetap jalan setelah restart. */
 export async function jalankanPengingat(sekarang: Date = new Date()): Promise<number> {
   const client = prisma()
@@ -224,12 +330,16 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
     const masihPerlu =
       reminder.type === 'PENGINGAT_BUKTI'
         ? order.paymentProofStatus === 'MENUNGGU_VERIFIKASI'
-        : order.paymentReviewStatus === 'MENUNGGU_PUTUSAN_UTAMA'
+        : reminder.type === 'PENGINGAT_PUTUSAN'
+          ? order.paymentReviewStatus === 'MENUNGGU_PUTUSAN_UTAMA'
+          : ['MENUNGGU_KONFIRMASI', 'PERUBAHAN_MENUNGGU_PERSETUJUAN'].includes(order.pickupStatus)
 
     if (!masihPerlu) {
       await selesaikanReminder({
         orderId: order.id,
-        types: [reminder.type as 'PENGINGAT_BUKTI' | 'PENGINGAT_PUTUSAN'],
+        types: [
+          reminder.type as 'PENGINGAT_BUKTI' | 'PENGINGAT_PUTUSAN' | 'PENGINGAT_JADWAL',
+        ],
       })
       continue
     }
@@ -239,18 +349,35 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
     const pesan =
       reminder.type === 'PENGINGAT_BUKTI'
         ? `Pengingat: bukti pembayaran pesanan ${order.orderNumber} belum diperiksa.`
-        : `Pengingat: putusan final pembayaran pesanan ${order.orderNumber} belum diambil.`
+        : reminder.type === 'PENGINGAT_PUTUSAN'
+          ? `Pengingat: putusan final pembayaran pesanan ${order.orderNumber} belum diambil.`
+          : `Pengingat: jadwal pesanan ${order.orderNumber} masih menunggu keputusan.`
 
-    const penerima = await client.user.findMany({
-      where: {
-        role:
-          reminder.type === 'PENGINGAT_PUTUSAN'
-            ? 'ADMIN_UTAMA'
-            : { in: ['ADMIN_BIASA', 'ADMIN_UTAMA'] },
-        isActive: true,
-      },
-      select: { id: true },
-    })
+    let penerima: Array<{ id: string }>
+    if (reminder.type === 'PENGINGAT_JADWAL') {
+      const usulan = await client.jadwalPerubahan.findFirst({
+        where: { orderId: order.id, status: 'MENUNGGU_PERSETUJUAN' },
+        orderBy: { createdAt: 'desc' },
+      })
+      penerima =
+        usulan?.jenis === 'USULAN_ADMIN'
+          ? [{ id: order.customerId }]
+          : await client.user.findMany({
+              where: { role: { in: ['ADMIN_BIASA', 'ADMIN_UTAMA'] }, isActive: true },
+              select: { id: true },
+            })
+    } else {
+      penerima = await client.user.findMany({
+        where: {
+          role:
+            reminder.type === 'PENGINGAT_PUTUSAN'
+              ? 'ADMIN_UTAMA'
+              : { in: ['ADMIN_BIASA', 'ADMIN_UTAMA'] },
+          isActive: true,
+        },
+        select: { id: true },
+      })
+    }
 
     for (const admin of penerima) {
       const dibuat = await buatNotifikasi({
@@ -276,10 +403,11 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
 
 export async function jalankanTugasPembayaran(
   sekarang: Date = new Date()
-): Promise<{ dibatalkan: number; pengingat: number }> {
+): Promise<{ dibatalkan: number; pengingat: number; noShow: number }> {
   const dibatalkan = await jalankanAutoCancel(sekarang)
   const pengingat = await jalankanPengingat(sekarang)
-  return { dibatalkan, pengingat }
+  const noShow = await jalankanNoShow(sekarang)
+  return { dibatalkan, pengingat, noShow }
 }
 
 /** Interval in-process; statusnya tetap berasal dari database sehingga aman restart. */
@@ -295,5 +423,5 @@ export function mulaiPenjadwalPembayaran(): void {
   }, 60_000)
   ;(interval as unknown as { unref?: () => void }).unref?.()
   globalData.__akiraPenjadwalInterval = interval
-  console.log('[PENJADWAL PEMBAYARAN] aktif (auto-cancel + pengingat 2 jam)')
+  console.log('[PENJADWAL PEMBAYARAN] aktif (auto-cancel, no-show, pengingat 2 jam)')
 }
