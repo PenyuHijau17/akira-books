@@ -4,7 +4,7 @@
 | Metadata | Nilai |
 |---|---|
 | Kode Dokumen | AKB-AGT-001 |
-| Versi | 1.2 — Aktif (Stok Agregat per Judul + ERD + Penyesuaian MVP) |
+| Versi | 1.3 — Aktif (Tahap 13: Backup, Keamanan & QA Produksi) |
 | Tanggal | 20 November 2026 |
 | Produk | Akira Books — Website Operasional Toko Buku |
 | Target Pembaca | AI Agent (`opencode`), Developer, Pemilik Proyek |
@@ -130,7 +130,7 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - GR-03: `saringPenjualanUntukPeran` menghapus semua field modal/laba untuk Admin Biasa; endpoint `/api/admin/laporan` mengembalikan 403 sebelum query; menu laporan hanya dirender untuk Admin Utama
   - Dashboard `/admin/laporan` (filter harian/bulanan/tahunan WIB) dan `/admin/penjualan-offline` memakai `@/components/ui`, 100% Bahasa Indonesia; tautan Header ditambahkan sesuai peran
   - Unit test baru: `penjualan-offline-laporan.test.ts`, `penjualan-offline-db.test.ts`, `penjualan-offline-isolasi.test.ts`, `penjualan-offline-koreksi-db.test.ts`; `tsc --noEmit` 0 error dan `npm test` 22 file / 225 test PASS
-- Tahap 12: Notifikasi dan Pengingat (implementasi selesai, belum di-commit/di-push)
+- Tahap 12: Notifikasi dan Pengingat (selesai, ditinjau, dan di-push)
   - Migrasi `20261128040000_tahap_12_notifikasi_pengingat` diterapkan; `prisma migrate status` up to date (12 migrasi)
   - `Notification` diperluas dengan `kategori`, `entitasId`, `metadata`, `readAt`, kunci unik per penerima, dan indeks inbox; `ScheduledReminder` memperoleh `jobKey`, `intervalMenit`, `zonaWaktu`, dan `terakhirDijalankan`
   - Model baru `NotificationOutbox` dengan `deliveryKey` unik, `attempts`, `maxAttempts`, `nextAttemptAt`, dan `escalationNotified` untuk retry bertahap anti-duplikasi
@@ -140,9 +140,19 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - Pengingat 2 jam WIB persisten lintas restart Docker/server, berhenti setelah pembayaran diputuskan, jadwal diputuskan, pesanan dibatalkan/Selesai (BR-025); `instrumentation.ts` mengejar tugas yang jatuh tempo saat startup
   - GR-03: `saringNotifikasiUntukPeran` membuang modal/laba secara rekursif untuk Customer/Admin Biasa sebelum payload dikirim
   - Unit test baru: `notifikasi-grouping.test.ts`, `notifikasi-mark-read.test.ts`, `notifikasi-outbox.test.ts`, `notifikasi-pengingat.test.ts`; `tsc --noEmit` 0 error dan `npm test` 26 file / 234 test PASS
+- Tahap 13: Backup, Keamanan, dan Pengujian Menyeluruh (implementasi selesai, belum di-commit/di-push)
+  - Migrasi `20261129040000_tahap_13_backup_keamanan` diterapkan; model `BackupArsip` menyimpan riwayat, checksum SHA-256, status, dan penanda retensi; `prisma migrate status` up to date (13 migrasi)
+  - Backup harian otomatis (default 02.00 WIB, sekali per hari WIB) + backup manual Admin Utama; dump PostgreSQL (`pg_dump`) dan seluruh direktori media dikemas `tar.gz`, lalu dienkripsi `age` dengan kunci publik dari environment (kunci privat tidak pernah masuk repositori/image)
+  - Retensi 30 hari: arsip lama dihapus otomatis, riwayat tetap ada dengan status `DIHAPUS`, dan setiap penghapusan tercatat di `AdminAuditLog` append-only (GR-06)
+  - Panel `/admin/backup` dan API `/api/admin/backup` dilindungi sesi server-side + peran Admin Utama (GR-02), verifikasi password, konfirmasi `YA`, dan OTP sekali pakai `OTP_BACKUP` untuk backup manual
+  - Skrip operasional: `scripts/backup-cli.sh`, `scripts/restore.sh`, dan `scripts/restore-drill.sh`; restore drill nyata berhasil pada database uji terisolasi + media uji tanpa merusak data utama
+  - Hardening `/api/admin/buku` dan `/api/admin/buku/[id]`: otorisasi server-side, DTO `costPrice` hanya untuk Admin Utama (GR-03), serta endpoint PUT/DELETE yang dipakai UI
+  - Perbaikan prerender produksi: `/checkout`, `/admin/buku`, `/pesanan/[id]`, dan `/store-status` memakai boundary/pemisahan klien serta `instant = false` bila diperlukan Next.js 16 Cache Components
+  - `.env.example` diperbarui tanpa nilai rahasia; `.gitignore` melindungi `backup-arsip/`, `storage/`, `*.age`, dan kunci privat
+  - Unit test baru: `backup-enkripsi.test.ts`, `backup-retensi.test.ts`, `backup-isolasi.test.ts`; `tsc --noEmit` 0 error, `npm test` 29 file / 248 test PASS, dan `npm run build` sukses (55 halaman)
 
 ### Active
-- Tahap 12 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
+- Tahap 13 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
 
 ### Blocked
 - (none)
@@ -152,6 +162,7 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
 - **Tahap 9**: Selesai, ditinjau, dan di-push (commit `0002298`)
 - **Tahap 10**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
 - **Tahap 11**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
-- **Tahap 12**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
+- **Tahap 12**: Selesai, ditinjau, dan di-push
+- **Tahap 13**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
 
 Today's date: Mon Nov 23 2026

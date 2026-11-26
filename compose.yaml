@@ -6,8 +6,18 @@
     container_name: akira-books-app
     ports:
       - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql://akira_books:akira_books_dev_only@db:5432/akira_books?schema=public
+      # Tahap 13 — backup terenkripsi age. Kunci privat TIDAK pernah masuk container.
+      AKIRA_BACKUP_AGE_PUBLIC_KEY: ${AKIRA_BACKUP_AGE_PUBLIC_KEY:-}
+      AKIRA_BACKUP_DIR: ${AKIRA_BACKUP_DIR:-/app/backup-arsip}
+      AKIRA_BACKUP_MEDIA_DIR: ${AKIRA_BACKUP_MEDIA_DIR:-/app/storage}
+      AKIRA_BACKUP_RETENSI_HARI: ${AKIRA_BACKUP_RETENSI_HARI:-30}
+      AKIRA_BACKUP_JAM_WIB: ${AKIRA_BACKUP_JAM_WIB:-02:00}
+      AKIRA_NOTIF_EKSTERNAL: ${AKIRA_NOTIF_EKSTERNAL:-}
     volumes:
       - .:/app
       - app_node_modules:/app/node_modules

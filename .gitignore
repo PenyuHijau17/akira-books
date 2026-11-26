@@ -24,6 +24,13 @@
 .DS_Store
 *.pem
 
+# Tahap 13 — arsip backup terenkripsi & media privat (jangan pernah di-commit)
+/backup-arsip/
+/storage/
+*.age
+*kunci-privat*
+*age-private*
+
 # debug
 npm-debug.log*
 yarn-debug.log*

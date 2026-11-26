@@ -17,6 +17,7 @@ import {
   selesaikanReminder,
 } from '@/lib/pembayaranServer'
 import { enqueueOutbox, jalankanOutbox } from '@/lib/notifikasiServer'
+import { jalankanBackupHarian } from '@/lib/backupServer'
 import {
   jenisPengingatValid,
   kunciPengingat,
@@ -441,6 +442,16 @@ export async function jalankanTugasPembayaran(
   return { dibatalkan, pengingat, noShow, outbox }
 }
 
+/** Backup harian (NFR-04): pengecekan jam & dedup hari WIB memakai database. */
+export async function jalankanTugasBackup(): Promise<void> {
+  try {
+    const hasil = await jalankanBackupHarian()
+    if (hasil) console.log(`[BACKUP HARIAN] arsip dibuat: ${hasil.namaFile}`)
+  } catch (error) {
+    console.error('[BACKUP HARIAN] gagal:', error)
+  }
+}
+
 /** Interval in-process; statusnya tetap berasal dari database sehingga aman restart. */
 export function mulaiPenjadwalPembayaran(): void {
   const globalData = globalThis as unknown as Record<string, unknown>
@@ -451,8 +462,9 @@ export function mulaiPenjadwalPembayaran(): void {
     jalankanTugasPembayaran().catch((error) => {
       console.error('[PENJADWAL PEMBAYARAN] gagal:', error)
     })
+    jalankanTugasBackup()
   }, 60_000)
   ;(interval as unknown as { unref?: () => void }).unref?.()
   globalData.__akiraPenjadwalInterval = interval
-  console.log('[PENJADWAL PEMBAYARAN] aktif (auto-cancel, no-show, pengingat 2 jam)')
+  console.log('[PENJADWAL PEMBAYARAN] aktif (auto-cancel, no-show, pengingat 2 jam, backup harian)')
 }

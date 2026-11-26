@@ -5,7 +5,7 @@
 // 100% Bahasa Indonesia, tema kertas klasik. GR-03: tidak ada field modal/laba.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import {
   AlertBanner,
   Badge,
@@ -155,7 +155,9 @@ export default function HalamanDetailPesanan({
   params: Promise<{ id: string }>
 }) {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  // Tahap 13: baca query setelah mount agar prerender produksi tidak memerlukan
+  // URL data (useSearchParams) di luar Suspense boundary.
+  const [berhasilDariUrl, setBerhasilDariUrl] = useState(false)
   const [idPesanan, setIdPesanan] = useState<string | null>(null)
   const [pesanan, setPesanan] = useState<Pesanan | null>(null)
   const [qris, setQris] = useState<QrisAktif | null>(null)
@@ -183,6 +185,7 @@ export default function HalamanDetailPesanan({
 
   useEffect(() => {
     params.then((p) => setIdPesanan(p.id))
+    setBerhasilDariUrl(new URLSearchParams(window.location.search).get('berhasil') === '1')
   }, [params])
 
   const muat = useCallback(async () => {
@@ -555,7 +558,7 @@ export default function HalamanDetailPesanan({
 
   return (
     <div className="container" style={{ padding: '2rem 0' }}>
-      {searchParams.get('berhasil') === '1' && (
+      {berhasilDariUrl && (
         <AlertBanner
           type="success"
           title="Pesanan berhasil dibuat"

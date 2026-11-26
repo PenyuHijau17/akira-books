@@ -112,6 +112,7 @@ export default function Header() {
           {user?.role === "ADMIN_UTAMA" && <a href="/admin/laporan">Laporan Keuangan</a>}
           {user?.role === "ADMIN_UTAMA" && <a href="/admin/qris">QRIS Toko</a>}
           {user?.role === "ADMIN_UTAMA" && <a href="/admin/notifikasi">Peringatan Notifikasi</a>}
+          {user?.role === "ADMIN_UTAMA" && <a href="/admin/backup">Backup &amp; Pemulihan</a>}
           {adalahAdmin && <a href="/admin/banner">Banner Promo</a>}
 
           {!memuat && !user && (

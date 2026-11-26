@@ -1,145 +1,108 @@
+// src/app/api/admin/buku/route.ts
+// Pengelolaan master buku — otorisasi server-side (GR-02) & isolasi modal/laba (GR-03).
+// Admin Biasa TIDAK pernah menerima costPrice / riwayat modal, baik di DTO maupun error.
+
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { boleLihatModalLaba } from '@/lib/rbac'
+import { getSessionUser } from '@/lib/auth'
+import { boleLihatModalLaba, butuhAksesAdmin } from '@/lib/rbac'
+import { catatAudit } from '@/lib/pembayaranServer'
+import { dtoBuku } from '@/lib/buku'
 
-// Helper: hanya Admin Utama yang boleh melihat/modal cost price (GR-03)
-// Semua role lain (Pengunjung, Customer, Admin Biasa) DILARANG keras
+function gagal(pesan: string, status: number) {
+  return NextResponse.json({ error: pesan }, { status })
+}
 
-// GET /api/admin/buku - Daftar buku untuk admin (semua field termasuk costPrice)
+// GET /api/admin/buku — daftar buku untuk admin.
 export async function GET(request: Request) {
   try {
+    const user = await getSessionUser(request)
+    if (!user) return gagal('Sesi tidak valid. Silakan masuk kembali.', 401)
+    if (!butuhAksesAdmin(user.role)) return gagal('Hanya admin yang dapat mengelola buku', 403)
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || ''
     const kategori = searchParams.get('kategori') || ''
-
     const where: any = {}
+    if (status) where.status = status
+    if (kategori) where.categoryId = kategori
 
-    if (status) {
-      where.status = status
-    }
-    if (kategori) {
-      where.categoryId = kategori
-    }
-
-    const books = await prisma().book.findMany({
-      where,
-      // Hilangkan include category untuk menghindari error tipe Prisma
-      // dan hanya gunakan where.categoryId untuk filter
-      orderBy: { title: 'asc' },
-    })
-
-    // GR-03: Filter costPrice dari respons hanya untuk Admin Utama
-    // BoleLihatModalLaba akan digunakan oleh middleware untuk menentukan role
-    // Saat ini, costPrice dihapus dari respons untuk semua pemanggil non-Admin-Utama
-    const booksFiltered = books.map((book: any) => {
-      const { costPrice, ...bookWithoutCostPrice } = book
-      return bookWithoutCostPrice
-    })
-
-    return NextResponse.json({ books: booksFiltered })
+    const books = await prisma().book.findMany({ where, orderBy: { title: 'asc' } })
+    return NextResponse.json({ books: books.map((book: any) => dtoBuku(book, user.role)) })
   } catch (error) {
     console.error('Error fetching admin buku:', error)
-    return NextResponse.json(
-      { error: 'Gagal mengambil data buku' },
-      { status: 500 }
-    )
+    return gagal('Gagal mengambil data buku', 500)
   }
 }
 
-// POST /api/admin/buku - Tambah buku baru
+// POST /api/admin/buku — tambah buku baru.
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const user = await getSessionUser(request)
+    if (!user) return gagal('Sesi tidak valid. Silakan masuk kembali.', 401)
+    if (!butuhAksesAdmin(user.role)) return gagal('Hanya admin yang dapat menambah buku', 403)
+
+    const body = await request.json().catch(() => null)
     const {
-      code,
-      title,
-      author,
-      publisher,
-      publishYear,
-      categoryId,
-      imageUrl,
-      description,
-      sellingPrice,
-      costPrice,
-      stockTotal,
-    } = body
+      code, title, author, publisher, publishYear, categoryId, imageUrl, description,
+      sellingPrice, costPrice, stockTotal,
+    } = body || {}
 
-    // Validasi field wajib
     if (!code || !title || !author || sellingPrice === undefined) {
-      return NextResponse.json(
-        { error: 'Field wajib tidak lengkap' },
-        { status: 400 }
-      )
+      return gagal('Field wajib tidak lengkap', 400)
     }
+    if (Number(stockTotal || 0) < 0) return gagal('Stok tidak boleh negatif', 400)
 
-    // GR-03: Hanya Admin Utama yang boleh menetapkan costPrice
-    // Cek role pemanggil - middleware RBAC yang aktif akan validasi
-    // Jika role bukan ADMIN_UTAMA dan costPrice disediakan, tolak request
-    const rolePengguna = 'ADMIN_BIASA' // Default: akan divalidasi oleh middleware
-    // TODO: Ambil role dari middleware/session: const rolePengguna = getRoleFromContext()
-    // if (!boleLihatModalLaba(rolePengguna) && costPrice !== undefined) {
-    //   return NextResponse.json(
-    //     { error: 'Hanya Admin Utama yang boleh menetapkan costPrice' },
-    //     { status: 403 }
-    //   )
-    // }
+    // GR-03: hanya Admin Utama yang boleh menetapkan modal per unit.
+    const modal = boleLihatModalLaba(user.role) ? Number(costPrice || 0) : 0
 
-    // OD-02: Hanya Admin Utama yang boleh menetapkan costPrice
-    // (validasi lebih lanjut dilakukan di middleware RBAC)
-    // Untuk saat ini, bi default costPrice ke 0 jika tidak ada yang Admin Utama
-    const actualCostPrice = costPrice ?? 0
-
-    // Buat buku
     const book = await prisma().book.create({
       data: {
-        code,
-        title,
-        author,
-        publisher: publisher || '',
-        publishYear: publishYear || 2024,
-        imageUrl: imageUrl || '',
-        description: description || '',
-        sellingPrice: sellingPrice,
-        costPrice: actualCostPrice,
-        stockTotal: stockTotal ?? 0,
-        stockReserved: 0, // Default 0 (BR-010)
+        code: String(code),
+        title: String(title),
+        author: String(author),
+        publisher: String(publisher || ''),
+        publishYear: Number(publishYear || 2024),
+        imageUrl: String(imageUrl || ''),
+        description: String(description || ''),
+        sellingPrice: Number(sellingPrice),
+        costPrice: modal,
+        stockTotal: Number(stockTotal || 0),
+        stockReserved: 0,
         status: 'TERSEDIA',
-        categoryId: categoryId || '',
-      },
-      include: {
-        BookCostHistory: true,
+        categoryId: String(categoryId || ''),
       },
     })
 
-    // Buat StockMovement terpisah setelah buku dibuat
-    if (stockTotal && stockTotal > 0) {
+    if (Number(stockTotal || 0) > 0) {
       await prisma().stockMovement.create({
         data: {
           bookId: book.id,
           type: 'MASUK',
-          quantity: stockTotal,
+          quantity: Number(stockTotal),
           reason: 'Stok awal saat pembuatan buku',
+          createdBy: user.id,
         },
       })
     }
 
-    return NextResponse.json({
-      success: true,
-      book,
-      message: 'Buku berhasil ditambahkan',
+    await catatAudit({
+      actorId: user.id,
+      actorRole: user.role,
+      action: 'BUAT_BUKU',
+      targetEntity: 'Book',
+      targetId: book.id,
+      oldValue: {},
+      newValue: dtoBuku(book, user.role),
+      reason: 'Penambahan buku baru',
     })
+
+    return NextResponse.json({ success: true, book: dtoBuku(book, user.role), message: 'Buku berhasil ditambahkan' })
   } catch (error: any) {
     console.error('Error creating book:', error)
-    // Handle duplicate code
-    if (error.code === 'P2003' || error.message?.includes('Unique constraint')) {
-      return NextResponse.json(
-        { error: 'Kode buku sudah ada. Gunakan kode yang unik.' },
-        { status: 400 }
-      )
+    if (error?.code === 'P2002' || String(error?.message || '').includes('Unique constraint')) {
+      return gagal('Kode buku sudah ada. Gunakan kode yang unik.', 400)
     }
-    return NextResponse.json(
-      { error: error.message || 'Gagal menambah buku' },
-      { status: 500 }
-    )
+    return gagal('Gagal menambah buku', 500)
   }
 }

@@ -606,7 +606,27 @@ model NotificationOutbox {
 }
 
 // ==========================================
-// 8. AUDIT LOG IMMUTABLE (BR-024, GR-06)
+// 8. BACKUP TERENKRIPSI AGE (NFR-04, TAHAP 13)
+// ==========================================
+
+model BackupArsip {
+  id              String      @id @default(uuid())
+  namaFile        String      @unique
+  ukuranByte      Int         @default(0)
+  jenis           String      // HARIAN | MANUAL
+  status          String      @default("BERHASIL") // BERHASIL | GAGAL | DIHAPUS
+  checksumSha256  String?     // Integritas arsip terenkripsi
+  dibuatOlehId    String?     // Null untuk backup otomatis/Sistem
+  keterangan      String?
+  dihapusPada     DateTime?   // Penanda retensi 30 hari; riwayat tetap ada
+  createdAt       DateTime    @default(now())
+
+  @@index([createdAt, status])
+  @@index([jenis, status])
+}
+
+// ==========================================
+// 9. AUDIT LOG IMMUTABLE (BR-024, GR-06)
 // ==========================================
 
 model AdminAuditLog {
@@ -623,7 +643,7 @@ model AdminAuditLog {
 }
 
 // ==========================================
-// 9. ENUM STATIS & PENNGAT
+// 10. ENUM STATIS & PENNGAT
 // ==========================================
 
 enum BookStatus {
