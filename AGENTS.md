@@ -82,6 +82,15 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - Script seed prisma/seed.ts untuk membuat akun Admin Utama awal beserta recovery code-nya
   - Admin account management endpoint: nonaktifkan/aktifkan Customer, buat/cabut Admin Biasa oleh Admin Utama dengan verifikasi OTP
   - Semua file kode tahap 4 diverifikasi `tsc --noEmit` 0 error
+- Tahap 5: Katalog, Pengelolaan Buku, Toko Libur, dan Banner Promosi selesai, teruji E2E, dan di-push
+- Tahap 6: Unit Testing & Quality Assurance selesai (13 file test, 121 test PASS) dan di-push
+- Tahap 7: Keranjang Belanja & Pemesanan selesai
+  - Migrasi `tahap_7_keranjang_pesanan` tersinkron (drift diselesaikan dengan `migrate resolve`, data tidak dihapus)
+  - Sinkronisasi stok otomatis + notifikasi + kewajiban tinjau ulang sebelum checkout
+  - Checkout atomik dengan `SELECT ... FOR UPDATE`, idempotensi, snapshot, tenggat 24 jam WIB, dan status awal yang benar
+  - Halaman `/keranjang`, `/checkout`, `/pesanan`, `/pesanan/[id]` memakai `@/components/ui` dan 100% Bahasa Indonesia
+  - Unit test Tahap 7 ditambahkan; `tsc --noEmit` 0 error dan `npm test` 121/121 PASS
+  - E2E nyata: blokir toko libur, penyesuaian stok, konfirmasi ulang, idempotensi, dan snapshot terverifikasi
 
 ### Active
 - (none)
@@ -91,7 +100,6 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
 
 ## 5. Implementasi Tahap Selanjutnya
 
-- **Tahap 5**: Katalog, Pengelolaan Buku, & Toko Libur - Selesai dan diverifikasi
-- **Tahap 6**: Unit Testing dan Quality Assurance - Selanjutnya
+- **Tahap 8**: Pembayaran QRIS/CFD, Bukti Pembayaran, dan Alokasi Pembayaran - Menunggu peninjauan pemilik proyek (GR-07)
 
 Today's date: Mon Nov 23 2026

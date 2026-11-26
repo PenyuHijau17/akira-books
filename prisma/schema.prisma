@@ -134,22 +134,32 @@ model BookCostHistory {
 
 model Cart {
   id            String      @id @default(uuid())
-  userId        String
-
-  // FK ke User
+  userId        String      @unique
   userUserId    String
+
+  // BR-012: versi & tinjauan ulang keranjang setelah penyesuaian stok
+  version         Int       @default(0)
+  approvedVersion Int       @default(0)
+  needsReview     Boolean   @default(false)
+  reviewReason    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
 }
 
 model CartItem {
   id            String      @id @default(uuid())
   cartId        String
   bookId        String
-  quantity      Int         // Kuantitas buku di keranjang
+  quantity      Int         // Kuantitas buku di keranjang (tanpa menahan stok, BR-010)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
 
   // FK ke Cart
   cartCartId    String
   // FK ke Book
   bookBookId    String
+
+  @@unique([cartId, bookId])
 }
 
 // Model Order (status sesuai state machine BR-001 s.d. BR-026)
@@ -175,13 +185,19 @@ model Order {
   pickupSundayDate   DateTime    // Tanggal Minggu di masa depan (BR-018, tutup 09.00)
   pickupGroupId      String?     // Opsional: gabung jadwal dengan pesanan lain
   paymentDeadline    DateTime    // Tenggat 24 jam sejak pembuatan (BR-009, BR-DUE-001)
+  totalAmount        Int         @default(0) // Total nominal snapshot pesanan (BR-011)
   pausedRemainingSeconds Int?     // Jeda hitung mundur saat ubah metode bayar (BR-016)
   lockedByAdminId    String?     // Admin yang mengunci order (seperti BR-002)
   lockExpiresAt      DateTime?   // Waktu kunce habis
   allocatedAmount    Int?        // Alih-alih nominal total, tracking per-allocation (OD-03)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @default(now()) @updatedAt
 
   // FK ke User
   customerUserId   String
+
+  @@index([customerId])
+  @@index([orderStatus])
 }
 
 // OrderItem: snapshot harga & kuantitas per buku di dalam order (BR-011)
@@ -190,9 +206,11 @@ model OrderItem {
   orderId       String
   bookId        String
   quantity      Int
+  snapshotCode  String      @default("") // Kode buku saat order dibuat
   snapshotTitle String      // Judul pada saat order dibuat (tidak berubah)
   snapshotSellingPrice Int      // Harga jual pada saat order (BR-011 - snapshot tidak berubah)
   snapshotCostPrice Int       // Cost price snapshot (Rahasia: Admin Utama, BR-004)
+  subtotal      Int         @default(0) // quantity x snapshotSellingPrice
 
   // FK ke Order
   orderOrderId   String

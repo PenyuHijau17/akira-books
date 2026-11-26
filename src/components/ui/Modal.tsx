@@ -28,15 +28,15 @@ export const Modal = ({
 }: ModalProps) => {
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "white", border: "1px solid #ccc", borderRadius: 8, padding: 20, maxWidth: 500 }}>
+      <div style={{ background: "#f5f0e5", border: "1px solid #d7ccc8", borderRadius: 8, padding: 20, maxWidth: 500, color: "#4d372d" }}>
         <h3 style={{ margin: 0, marginBottom: 16, fontSize: 18, color: "#333" }}>
           {title}
         </h3>
         {children}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
           {[onCancel && (
-            <button style={{ marginRight: 8, background: "#f5f0e5", border: "1px solid #ccc", padding: "6px 12px", cursor: "pointer" }} onClick={() => onOpenChange(false)}>
-              {cancelText}
+            <button style={{ marginRight: 8, background: "#f5f0e5", border: "1px solid #ccc", padding: "6px 12px", cursor: "pointer" }} onClick={() => { onCancel?.(); onOpenChange(false) }}>
+              {cancelText ?? "Batal"}
             </button>
           )]}
           {[onConfirm && (
@@ -48,10 +48,13 @@ export const Modal = ({
                 padding: "6px 12px",
                 cursor: "pointer",
               }}
-              onClick={() => open && onOpenChange(false)
-              }
+              onClick={() => {
+                if (!open) return
+                onConfirm?.()
+                onOpenChange(false)
+              }}
             >
-              {confirmText}
+              {confirmText ?? "Ya"}
             </button>
           )]}
         </div>

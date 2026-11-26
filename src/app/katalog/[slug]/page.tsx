@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
-import prisma from '@/lib/prisma'
+import { useState, useEffect } from 'react'
+import { AlertBanner, Button } from '@/components/ui'
 
 export default function DetailBukuPage({
   params,
@@ -9,7 +9,33 @@ export default function DetailBukuPage({
   const [book, setBook] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const coverRef = useRef<HTMLImageElement>(null)
+  const [pesanKeranjang, setPesanKeranjang] = useState<{ jenis: 'success' | 'error'; teks: string } | null>(null)
+  const [sedangMenambah, setSedangMenambah] = useState(false)
+
+  async function tambahKeKeranjang() {
+    if (!book?.id) return
+    setSedangMenambah(true)
+    setPesanKeranjang(null)
+    try {
+      const res = await fetch('/api/keranjang', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId: book.id, quantity: 1 }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Gagal menambah ke keranjang')
+      setPesanKeranjang({ jenis: 'success', teks: 'Buku berhasil ditambahkan ke keranjang.' })
+    } catch (e: any) {
+      setPesanKeranjang({
+        jenis: 'error',
+        teks: e?.message === 'Tidak diizinkan'
+          ? 'Silakan masuk sebagai pelanggan untuk menambah buku ke keranjang.'
+          : e?.message || 'Terjadi kesalahan saat menambah ke keranjang',
+      })
+    } finally {
+      setSedangMenambah(false)
+    }
+  }
 
   useEffect(() => {
     fetchDetail()
@@ -47,7 +73,7 @@ export default function DetailBukuPage({
   if (error) {
     return (
       <div className="p-4 text-center text-red-600">
-        <h3>Error</h3>
+        <h3>Terjadi Kesalahan</h3>
         <p>{error}</p>
         <a
           href="/katalog"
@@ -86,7 +112,7 @@ export default function DetailBukuPage({
           <div
             className="w-full h-64 bg-amber-200 flex items-center justify-center rounded-md mb-4 text-gray-400"
           >
-            <span>No Cover Available</span>
+            <span>Sampul belum tersedia</span>
           </div>
         )}
 
@@ -122,6 +148,25 @@ export default function DetailBukuPage({
             </p>
 
             
+            <div style={{ marginTop: '1rem' }}>
+              {pesanKeranjang && (
+                <AlertBanner
+                  type={pesanKeranjang.jenis}
+                  title={pesanKeranjang.jenis === 'success' ? 'Berhasil' : 'Perhatian'}
+                  description={pesanKeranjang.teks}
+                />
+              )}
+              <Button
+                onClick={tambahKeKeranjang}
+                isLoading={sedangMenambah}
+                disabled={!book || book.stockTotal <= 0}
+              >
+                Tambah ke Keranjang
+              </Button>{' '}
+              <a href="/keranjang" style={{ marginLeft: '0.5rem' }}>
+                Lihat Keranjang
+              </a>
+            </div>
 
             <p className="text-gray-500 text-sm mt-2">Stok Tersedia</p>
             <p className="text-2xl font-semibold">

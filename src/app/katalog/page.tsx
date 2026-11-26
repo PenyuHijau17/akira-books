@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+import BannerCarousel from '@/components/BannerCarousel'
 
 // Helper ambil query dari URL
 function useQueryParams() {
@@ -58,6 +59,11 @@ export default function KatalogPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Banner Promosi */}
+      <div className="max-w-7xl mx-auto px-4 pt-4">
+        <BannerCarousel />
+      </div>
+
       {/* Header Search */}
       <div className="p-4 border-b border-gray-200">
         <div className="max-w-7xl mx-auto flex items-center justify-between">

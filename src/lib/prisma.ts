@@ -1,9 +1,9 @@
 // src/lib/prisma.ts
-// Koneksi Prisma Client singleton — kompatibel dengan Prisma 7
-// prisma7.config.ts (datasource URL diambil dari config, bukan schema)
+// Koneksi Prisma Client singleton — Prisma 7 dengan driver adapter PostgreSQL
+// DATABASE_URL diambil dari environment (disuntikkan oleh Docker Compose).
 
-// Import PrismaClient dari Prisma 7 (client di ./src/generated/prisma/client)
 import { PrismaClient } from '@/generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 // Type untuk menampung instance Prisma (untuk singleton di Edge Runtime)
 type PrismaClientType = PrismaClient;
@@ -14,11 +14,11 @@ let prisma: PrismaClientType | null = null;
 // Fungsi untuk mendapatkan instance Prisma (singleton)
 function getPrisma() {
   if (!prisma) {
-    // Import dinamis untuk menghindari init ganda di Edge Functions
-    // dan sesuai dengan cara Prisma 7 diasuransi di prisma7.config.ts
-    // @ts-ignore - Prisma 7 memerlukan adapter di options tapi project ini
-    // menggunakan data source dari environment variable yang terkonfigurasi di Docker
+    // Prisma 7 mewajibkan driver adapter (mis. PrismaPg) untuk PostgreSQL.
+    const connectionString = process.env.DATABASE_URL;
+    const adapter = new PrismaPg({ connectionString });
     prisma = new PrismaClient({
+      adapter,
       log: ['error', 'warn'],
     });
   }

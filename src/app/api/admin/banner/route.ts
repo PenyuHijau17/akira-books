@@ -1,21 +1,65 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getSessionUser, type SessionUser } from '@/lib/auth'
 
-// Helper: ambil user role dari session
-const getUserRole = (): 'ADMIN_BIASA' | 'ADMIN_UTAMA' | 'PENGUNGGUNG' | 'CUSTOMER' => {
-  return 'ADMIN_BIASA' // Default untuk testing; di implementasi nyoba dari session
+// Tipe minimal banner yang dikembalikan ke klien
+type BannerRecord = {
+  id: string
+  title: string | null
+  description: string | null
+  imageUrl: string
+  url: string | null
+  sortOrder: number
+  status: string
+  submittedById: string
+  rejectedById: string | null
+  rejectedAt: Date | null
+  rejectReason: string | null
+  createdAt: Date
 }
 
-// POST /api/admin/banner - Admin Biasa mengajukan banner baru
-// Kuota maksimal 3 Pending per Admin Biasa
+/**
+ * Sembunyikan data sensitif dari Admin Biasa (GR-03):
+ * - rejectReason hanya untuk Admin Utama
+ * - identitas penolak (rejectedById) tidak pernah dikirim ke Admin Biasa
+ */
+function sanitizeBanner(banner: BannerRecord, role: SessionUser['role']) {
+  const base = {
+    id: banner.id,
+    title: banner.title,
+    description: banner.description,
+    imageUrl: banner.imageUrl,
+    url: banner.url,
+    sortOrder: banner.sortOrder,
+    status: banner.status,
+    createdAt: banner.createdAt,
+    submittedById: banner.submittedById,
+  }
+
+  if (role === 'ADMIN_UTAMA') {
+    return {
+      ...base,
+      rejectedById: banner.rejectedById,
+      rejectedAt: banner.rejectedAt,
+      rejectReason: banner.rejectReason,
+    }
+  }
+
+  return base
+}
+
+// POST /api/admin/banner - Admin mengajukan banner baru (status PENDING)
+// Kuota: maksimal 3 PENDING per Admin Biasa
 export async function POST(request: Request) {
   try {
-    const role = getUserRole()
+    const user = await getSessionUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Silakan masuk terlebih dahulu' }, { status: 401 })
+    }
 
-    // Hanya Admin Biasa yang boleh ajukan
-    if (role !== 'ADMIN_BIASA') {
+    if (user.role !== 'ADMIN_BIASA' && user.role !== 'ADMIN_UTAMA') {
       return NextResponse.json(
-        { error: 'Hanya Admin Biasa yang boleh mengajukan banner' },
+        { error: 'Hanya admin yang boleh mengajukan banner' },
         { status: 403 }
       )
     }
@@ -23,90 +67,89 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { title, description, imageUrl, url } = body
 
-    // Validasi: gambar wajib
-    if (!imageUrl) {
-      return NextResponse.json(
-        { error: 'Gambar banner wajib diunggah' },
-        { status: 400 }
-      )
+    if (!imageUrl || String(imageUrl).trim().length === 0) {
+      return NextResponse.json({ error: 'Gambar banner wajib diunggah' }, { status: 400 })
     }
 
-    // Cek kuota: Admin Biasa boleh maksimal 3 pending
-    const pendingCount = await ((prisma as any).banner.count({
-      where: {
-        submittedById: 'admin-session-id',
-        status: 'PENDING',
-      },
-    })) as number
+    const client = prisma()
 
-    if (pendingCount >= 3) {
+    // Kuota 3 PENDING hanya berlaku untuk Admin Biasa
+    if (user.role === 'ADMIN_BIASA') {
+      const pendingCount = await client.banner.count({
+        where: { submittedById: user.id, status: 'PENDING' },
+      })
+
+      if (pendingCount >= 3) {
+        return NextResponse.json(
+          { error: 'Kuota pengajuan banner PENDING maksimal 3 sudah tercapai' },
+          { status: 403 }
+        )
+      }
+    }
+
+    const banner = await client.banner.create({
+      data: {
+        title: title ? String(title) : null,
+        description: description ? String(description) : null,
+        imageUrl: String(imageUrl).trim(),
+        url: url ? String(url).trim() : null,
+        status: 'PENDING',
+        submittedById: user.id,
+      },
+    })
+
+    return NextResponse.json(
+      {
+        success: true,
+        banner: sanitizeBanner(banner as BannerRecord, user.role),
+        message: 'Banner berhasil diajukan, menunggu persetujuan Admin Utama',
+      },
+      { status: 201 }
+    )
+  } catch (error: unknown) {
+    console.error('Error creating banner:', error)
+    return NextResponse.json({ error: 'Gagal membuat banner' }, { status: 500 })
+  }
+}
+
+// GET /api/admin/banner - Daftar banner sesuai peran
+export async function GET(request: Request) {
+  try {
+    const user = await getSessionUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Silakan masuk terlebih dahulu' }, { status: 401 })
+    }
+
+    if (user.role !== 'ADMIN_BIASA' && user.role !== 'ADMIN_UTAMA') {
       return NextResponse.json(
-        { error: 'Kuota pengajuan banner PENDING maksimal 3 sudah tercapai' },
+        { error: 'Hanya admin yang boleh melihat daftar banner' },
         { status: 403 }
       )
     }
 
-    // Buat banner dengan status PENDING
-    const banner = await ((prisma as any).banner.create({
-      data: {
-        title,
-        description,
-        imageUrl,
-        url,
-        status: 'PENDING',
-        submittedById: 'admin-session-id',
-      },
-    })) as any
-
-    return NextResponse.json({
-      success: true,
-      banner,
-      message: 'Banner berhasil diajukan, menunggu persetujuan Admin Utama',
-    })
-  } catch (error: any) {
-    console.error('Error creating banner:', error)
-    return NextResponse.json(
-      { error: 'Gagal membuat banner' },
-      { status: 500 }
-    )
-  }
-}
-
-// GET /api/admin/banner - Daftar banner (dilihat berdasarkan peran)
-export async function GET(request: Request) {
-  try {
-    const role = getUserRole()
     const { searchParams } = new URL(request.url)
     const statusFilter = searchParams.get('status') || ''
 
-    const where: any = {}
+    const where: { submittedById?: string; status?: string } = {}
 
-    // Jika Admin Biasa, hanya lihat pending-nya sendiri
-    if (role === 'ADMIN_BIASA') {
-      where.submittedById = 'admin-session-id'
-      if (statusFilter) {
-        where.status = statusFilter
-      }
+    // Admin Biasa hanya melihat banner miliknya sendiri
+    if (user.role === 'ADMIN_BIASA') {
+      where.submittedById = user.id
     }
-    // Jika Admin Utama, boleh filter semua status
-    else if (role === 'ADMIN_UTAMA') {
-      if (statusFilter) {
-        where.status = statusFilter
-      }
+    if (statusFilter) {
+      where.status = statusFilter
     }
-    // Pengunjung/Customer tidak boleh lihat daftar banner
 
-    const banners = await ((prisma as any).banner.findMany({
+    const banners = await prisma().banner.findMany({
       where,
-      orderBy: { sortOrder: 'asc' },
-    })) as any[]
+      orderBy: { createdAt: 'desc' },
+    })
 
-    return NextResponse.json({ banners })
-  } catch (error: any) {
+    return NextResponse.json({
+      banners: (banners as BannerRecord[]).map((b) => sanitizeBanner(b, user.role)),
+    })
+  } catch (error: unknown) {
     console.error('Error fetching banners:', error)
-    return NextResponse.json(
-      { error: 'Gagal mengambil data banner' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Gagal mengambil data banner' }, { status: 500 })
   }
 }

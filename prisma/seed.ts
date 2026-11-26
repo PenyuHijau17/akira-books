@@ -1,23 +1,27 @@
 // prisma/seed.ts
-// Script seed untuk membuat akun Admin Utama awal dan recovery code
+// Script seed untuk membuat akun Admin Utama awal dan recovery code.
 // Dijalankan via: docker compose exec app npx tsx prisma/seed.ts
 
-// Import PrismaClient dengan konfigurasi dari environment
-require('dotenv').config({
-  path: '.env',
-});
+import 'dotenv/config';
+import crypto from 'crypto';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-const { PrismaClient } = require('@prisma/client');
+const connectionString = process.env.DATABASE_URL;
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
-const prisma = new PrismaClient({
-  // Konfigurasi dari .env: postgresql://akira_books:akira_books_dev_only@localhost:5433/akira_books?schema=public
-  connectionString: process.env.DATABASE_URL,
-});
+// Format hash harus sama dengan verifikasi di src/app/api/auth/route.ts: "<salt>:<hash>"
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${derived}`;
+}
 
 async function main() {
   console.log('=== Memulai seeding akun awal ===\n');
 
-  // Cek apakah sudah ada user
+  // Cek apakah sudah ada Admin Utama
   const existingAdmin = await prisma.user.findFirst({
     where: { role: 'ADMIN_UTAMA' },
   });
@@ -25,25 +29,14 @@ async function main() {
   if (existingAdmin) {
     console.log('Admin Utama sudah ada, lewati pembuatan akun.');
   } else {
-    // Generate salt dan hash sandi menggunakan scrypt
-    const crypto = require('crypto');
-
-    const generateAdminSandi = () => {
-      const salt = crypto.randomBytes(16).toString('hex');
-      const derivedKey = crypto.scryptSync('admin123', salt, 64, { n: 16384, r: 8, p: 1 });
-      return {
-        hash: derivedKey.toString('hex'),
-        salt,
-      };
-    };
-
-    const { hash: sandiHash, salt: sandiSalt } = generateAdminSandi();
+    const adminEmail = 'admin@akirabooks.id';
+    const adminPassword = 'admin123';
 
     // Buat akun Admin Utama pertama
     const admin = await prisma.user.create({
       data: {
-        email: 'admin@akirabooks.id',
-        passwordHash: sandiHash,
+        email: adminEmail,
+        passwordHash: hashPassword(adminPassword),
         name: 'Admin Utama',
         role: 'ADMIN_UTAMA',
         isActive: true,
@@ -51,6 +44,7 @@ async function main() {
     });
 
     console.log(`✓ Akun Admin Utama dibuat: ${admin.email}`);
+    console.log(`   Kata sandi awal : ${adminPassword}`);
 
     // Buat recovery code untuk Admin Utama
     const recoveryCode = Math.floor(100000 + Math.random() * 899999).toString();
@@ -69,23 +63,38 @@ async function main() {
         type: 'RECOVERY_ADMIN',
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 hari
         failedAttempts: 0,
+        userUserId: admin.id,
       },
     });
 
-    console.log('✓ Recovery code dibuat dan disimpan (30 hari validity)');
+    console.log('✓ Recovery code dibuat dan disimpan (valid 30 hari)');
     console.log(
-      '⚠️  Simpan recovery code ini dalam keadaan terenkripsi di lokasi yang aman:',
+      '⚠️  Simpan recovery code ini di lokasi aman (hanya ditampilkan sekali):',
     );
     console.log(`   Recovery Code: ${recoveryCode}`);
-    console.log(
-      '   (Gunakan untuk pemulihan akun Admin Utama jika lupa kata sandi)',
-    );
   }
 
-  // Catat informasi penting
+  // Seed akun Admin Biasa untuk pengujian alur banner
+  const existingAdminBiasa = await prisma.user.findFirst({
+    where: { role: 'ADMIN_BIASA' },
+  });
+
+  if (!existingAdminBiasa) {
+    const biasa = await prisma.user.create({
+      data: {
+        email: 'adminbiasa@akirabooks.id',
+        passwordHash: hashPassword('adminbiasa123'),
+        name: 'Admin Biasa',
+        role: 'ADMIN_BIASA',
+        isActive: true,
+      },
+    });
+    console.log(`✓ Akun Admin Biasa dibuat: ${biasa.email}`);
+    console.log('   Kata sandi awal : adminbiasa123');
+  }
+
   const userCount = await prisma.user.count();
   console.log(`\nTotal user di database: ${userCount}`);
-
   console.log('\n=== Seeding selesai ===');
 }
 

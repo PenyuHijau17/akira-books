@@ -6,35 +6,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 
-import { notFound } from 'next/navigation';
-
-// Komponen Header
-const Header = () => {
-  return (
-    <nav className="navbar">
-      <div className="container">
-        <a href="/" className="logo">
-          Akira Books
-        </a>
-
-        <div className="nav-links">
-          <a href="/katalog">Katalog</a>
-          <a href="/keranjang">Keranjang</a>
-          <a href="/account">Akun</a>
-          {/* Admin links - akan divalidasi middleware */}
-          {/* Role akan ditambahkan melalui query params atau middleware */}
-          {typeof window !== "undefined" &&
-            (window as any).userRole === "ADMIN_UTAMA" &&
-            (
-              <a href="/admin/banner" className="nav-link">
-                Banner Promo
-              </a>
-            )}
-        </div>
-      </div>
-    </nav>
-  );
-};
+import Header from '@/components/Header';
 
 // Komponen Footer
 const Footer = () => {
@@ -53,7 +25,9 @@ const Footer = () => {
             <ul className="list-disc list-inside">
               <li><a href="/katalog">Katalog</a></li>
               <li><a href="/keranjang">Keranjang</a></li>
-              <li><a href="/masuk">Masuk</a></li>
+              <li><a href="/pesanan">Pesanan</a></li>
+              <li><a href="/login">Masuk</a></li>
+              <li><a href="/register">Daftar</a></li>
             </ul>
           </div>
         </div>

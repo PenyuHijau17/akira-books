@@ -12,7 +12,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   asChild?: boolean
 }
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>((props) => {
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>((props, ref) => {
   const variant = props.variant ?? "primary"
   const isLoading = props.isLoading ?? false
   const asChild = props.asChild ?? false
@@ -30,6 +30,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>((props) =
 
   return (
     <button
+      ref={ref}
       className={`
         inline-flex items-center justify-center rounded-md 
         font-medium transition-colors 

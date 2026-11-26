@@ -8,8 +8,9 @@ import * as React from "react"
 
 export interface AlertBannerProps {
   type: "error" | "success" | "warning" | "info"
-  title: string
+  title?: string
   description?: string
+  children?: React.ReactNode
   // Untuk status toko libur
   isStoreClosed?: boolean
   closureReason?: string
@@ -49,6 +50,7 @@ export const AlertBanner = ({
   type,
   title,
   description,
+  children,
   isStoreClosed,
   closureReason,
 }: AlertBannerProps) => {
@@ -56,21 +58,18 @@ export const AlertBanner = ({
   const icon = icons[type] || icons.info
 
   return (
-    <div className="rounded-md p-4 mb-4 flex items-start">
+    <div
+      className="rounded-md p-4 mb-4 flex items-start"
+      style={{ backgroundColor: style.bg, border: style.border }}
+    >
       {/* Status toko libur */}
       {isStoreClosed && closureReason && (
         <div className="flex items-start mb-3">
-          <svg
-            className="flex-shrink-0 w-4 h-4 text-red-500"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M18 6L6 18m0-6l-6 6m6-6l6 6"
-            />
+          <svg className="flex-shrink-0 w-4 h-4 text-red-500" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M18 6L6 18m0-6l-6 6m6-6l6 6" />
           </svg>
           <div className="ml-3 flex-1">
-            <p className="text-sm text-red-700 font-medium">{title}</p>
+            {title && <p className="text-sm text-red-700 font-medium">{title}</p>}
             {closureReason && (
               <p className="text-xs text-red-600">{closureReason}</p>
             )}
@@ -80,21 +79,17 @@ export const AlertBanner = ({
 
       {/* Notifikasi biasa */}
       {!isStoreClosed && (
-        <div className="flex items-start">
-          <svg
-            className="flex-shrink-0 w-4 h-4"
-            viewBox="0 0 24 24"
-          >
+        <div className="flex items-start w-full">
+          <svg className="flex-shrink-0 w-4 h-4 mt-0.5" viewBox="0 0 24 24">
             <path
               fill="currentColor"
               d={getIconPath(icon as "error" | "success" | "warning" | "info")}
             />
           </svg>
           <div className="ml-3 flex-1 min-w-0">
-            <p className="text-sm font-medium">{title}</p>
-            {description && (
-              <p className="text-xs">{description}</p>
-            )}
+            {title && <p className="text-sm font-medium">{title}</p>}
+            {description && <p className="text-xs">{description}</p>}
+            {children && <div className="text-sm">{children}</div>}
           </div>
         </div>
       )}

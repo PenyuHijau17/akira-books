@@ -15,7 +15,7 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLElement> {
     | "neutral"
 }
 
-export const Badge = React.forwardRef<HTMLElement, BadgeProps>((props) => {
+export const Badge = React.forwardRef<HTMLElement, BadgeProps>((props, ref) => {
   const variant = props.variant ?? "neutral"
 
   const variantStyles = {
@@ -53,7 +53,7 @@ export const Badge = React.forwardRef<HTMLElement, BadgeProps>((props) => {
   `
 
   return (
-    <span className={badgeClass} {...props}>
+    <span ref={ref} className={badgeClass} {...props}>
       {props.children}
     </span>
   )

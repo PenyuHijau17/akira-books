@@ -9,6 +9,7 @@ import { can, boleLihatModalLaba } from '@/lib/rbac';
 
 // Import komponen styling (CSS modules sudah konfigurasinya)
 import styles from '@/app/globals.css';
+import BannerCarousel from '@/components/BannerCarousel';
 
 // Type untuk fitur utama
 type Fitur = {
@@ -74,7 +75,12 @@ export default function Page() {
 
   return (
     <main>
-      // Bagian Hero
+      {/* Banner Promosi (hanya tampil jika ada banner aktif) */}
+      <div className="max-w-7xl mx-auto px-4 pt-6">
+        <BannerCarousel />
+      </div>
+
+      {/* Bagian Hero */}
       <header className="hero-section">
         <div className="max-w-7xl mx-auto px-4 py-12">
           <h1 className="hero-title">
