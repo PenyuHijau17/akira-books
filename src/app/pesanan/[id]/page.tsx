@@ -20,6 +20,7 @@ import {
   labelStatusBukti,
   labelStatusJadwal,
   labelStatusPesanan,
+  labelStatusRefund,
 } from '@/lib/pesanan'
 
 type ItemPesanan = {
@@ -166,6 +167,7 @@ export default function HalamanDetailPesanan({
   const [alasanMetode, setAlasanMetode] = useState('')
   const [jamTambahan, setJamTambahan] = useState('24')
   const [alasanTenggat, setAlasanTenggat] = useState('')
+  const [alasanPembatalan, setAlasanPembatalan] = useState('')
   const [daftarMinggu, setDaftarMinggu] = useState<string[]>([])
   const [tanggalJadwal, setTanggalJadwal] = useState('')
   const [alasanJadwal, setAlasanJadwal] = useState('')
@@ -255,6 +257,17 @@ export default function HalamanDetailPesanan({
     !!pesanan &&
     pesanan.orderStatus === 'MENUNGGU_PEMBAYARAN' &&
     pesanan.paymentProofStatus !== 'TERVERIFIKASI'
+
+  const pembayaranFinal: boolean =
+    !!pesanan &&
+    (pesanan.paidAt !== null ||
+      pesanan.paymentProofStatus === 'TERVERIFIKASI' ||
+      pesanan.paymentReviewStatus === 'DISETUJUI')
+
+  const bisaBatalkanSendiri: boolean =
+    !!pesanan &&
+    !['SELESAI', 'DIBATALKAN'].includes(pesanan.orderStatus) &&
+    !pembayaranFinal
 
   const totalTerpilih = useMemo(() => {
     const semua = pesanan
@@ -486,6 +499,37 @@ export default function HalamanDetailPesanan({
     await kirimJadwal('LEPAS_GABUNGAN')
   }
 
+  async function batalkanPesanan() {
+    if (!pesanan) return
+    if (alasanPembatalan.trim().length < 3) {
+      setPesanError('Alasan pembatalan wajib diisi minimal 3 karakter')
+      return
+    }
+    const konfirmasi = window.confirm(
+      'Pembatalan bersifat final dan stok buku akan dikembalikan. Lanjutkan?'
+    )
+    if (!konfirmasi) return
+    setSedangMemproses(true)
+    setPesanError(null)
+    setPesanSukses(null)
+    try {
+      const res = await fetch('/api/pembatalan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: pesanan.id, alasan: alasanPembatalan }),
+      })
+      const isi = await res.json()
+      if (!res.ok) throw new Error(isi?.error || 'Pembatalan gagal')
+      setPesanSukses(isi.pesan || 'Pesanan berhasil dibatalkan.')
+      setAlasanPembatalan('')
+      await muat()
+    } catch (error: any) {
+      setPesanError(error?.message || 'Pembatalan gagal')
+    } finally {
+      setSedangMemproses(false)
+    }
+  }
+
   useEffect(() => {
     if (!daftarTerpilih.length || !pesanan) return
     const nilai = daftarTerpilih.reduce((jumlah: number, id) => {
@@ -557,6 +601,7 @@ export default function HalamanDetailPesanan({
             <CardContent style={{ display: 'grid', gap: '0.4rem' }}>
               <div>Status pembayaran: {labelStatusBukti(pesanan.paymentProofStatus)}</div>
               <div>Status jadwal: {labelStatusJadwal(pesanan.pickupStatus)}</div>
+              <div>Status refund: {labelStatusRefund(pesanan.refundStatus)}</div>
               <div>Metode pembayaran: {pesanan.paymentMethod === 'QRIS' ? 'QRIS' : 'Tunai di Tempat (CFD)'}</div>
               <div>Pengambilan: {tanggalLengkap(pesanan.pickupSundayDate)} WIB</div>
               <div>Tenggat pembayaran: {tanggalLengkap(pesanan.paymentDeadline)} WIB</div>
@@ -972,6 +1017,61 @@ export default function HalamanDetailPesanan({
               </CardContent>
             </Card>
           )}
+
+          <Card style={{ marginBottom: '1rem' }}>
+            <CardHeader>
+              <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#4d372d' }}>
+                Pembatalan Pesanan
+              </h2>
+            </CardHeader>
+            <CardContent style={{ display: 'grid', gap: '0.75rem' }}>
+              {pesanan.orderStatus === 'DIBATALKAN' ? (
+                <AlertBanner
+                  type="warning"
+                  title="Pesanan dibatalkan"
+                  description={
+                    (pesanan.cancelReason || 'Pembatalan dicatat.') +
+                    ' Pembatalan bersifat final. Jika pembayaran sudah lunas, refund dikelola terpisah oleh Admin Utama.'
+                  }
+                />
+              ) : pesanan.orderStatus === 'SELESAI' ? (
+                <AlertBanner
+                  type="info"
+                  title="Pesanan selesai"
+                  description="Pesanan yang sudah selesai tidak dapat dibatalkan."
+                />
+              ) : pembayaranFinal ? (
+                <AlertBanner
+                  type="warning"
+                  title="Pembayaran sudah disetujui final"
+                  description="Customer tidak dapat membatalkan sendiri. Silakan hubungi admin untuk pembatalan dan pengajuan refund."
+                />
+              ) : (
+                <>
+                  <AlertBanner
+                    type="warning"
+                    title="Pembatalan bersifat final"
+                    description="Stok buku yang tertahan akan dikembalikan sekali. Pastikan Anda benar-benar membatalkan pesanan ini."
+                  />
+                  <Input
+                    as="textarea"
+                    label="Alasan pembatalan"
+                    rows={2}
+                    value={alasanPembatalan}
+                    onChange={(e) => setAlasanPembatalan(e.target.value)}
+                    helperText="Wajib diisi minimal 3 karakter."
+                  />
+                </>
+              )}
+            </CardContent>
+            {bisaBatalkanSendiri && (
+              <CardFooter>
+                <Button variant="danger" onClick={batalkanPesanan} isLoading={sedangMemproses}>
+                  Batalkan Pesanan Saya
+                </Button>
+              </CardFooter>
+            )}
+          </Card>
 
           <Card>
             <CardHeader>

@@ -3,16 +3,7 @@
 // GR-02, BR-005: Otorisasi server-side, Admin Utama tunggal
 
 import { NextResponse } from 'next/server';
-
-// Fungsi helper untuk Prisma Client (sesuai pattern di src/lib/prisma.ts)
-function getPrisma() {
-  // @ts-ignore - Prisma 7 memerlukan adapter di options tapi project ini
-  // menggunakan data source dari environment variable yang terkonfigurasi di Docker
-  const { PrismaClient } = require('@prisma/client');
-  return new PrismaClient({ log: ['error', 'warn'] });
-}
-
-const prisma = getPrisma();
+import prisma from '@/lib/prisma';
 
 // GET: Daftar user berdasarkan role
 export async function GET(request: Request) {
@@ -25,7 +16,7 @@ export async function GET(request: Request) {
     where.role = role;
   }
 
-  const users = await prisma.user.findMany({
+  const users = await prisma().user.findMany({
     where,
     select: {
       id: true,
@@ -60,7 +51,7 @@ export async function POST(request: Request) {
         );
       }
 
-      const targetUser = await prisma.user.findUnique({
+      const targetUser = await prisma().user.findUnique({
         where: { id: targetUserId },
       });
 
@@ -73,7 +64,7 @@ export async function POST(request: Request) {
 
       const newIsActive = action === 'enable-user';
 
-      await prisma.user.update({
+      await prisma().user.update({
         where: { id: targetUserId },
         data: { isActive: newIsActive, deactivationReason: reason || null },
       });
@@ -94,7 +85,7 @@ export async function POST(request: Request) {
         );
       }
 
-      const existing = await prisma.user.findUnique({
+      const existing = await prisma().user.findUnique({
         where: { email },
       });
 
@@ -110,7 +101,7 @@ export async function POST(request: Request) {
       const derivedKey = crypto.scryptSync('password', salt, 64, { n: 16384, r: 8, p: 1 });
       const passwordHash = derivedKey.toString('hex');
 
-      const adminBiasa = await prisma.user.create({
+      const adminBiasa = await prisma().user.create({
         data: {
           email,
           passwordHash,
@@ -142,7 +133,7 @@ export async function POST(request: Request) {
         );
       }
 
-      const targetUser = await prisma.user.findUnique({
+      const targetUser = await prisma().user.findUnique({
         where: { id: targetUserId },
       });
 
@@ -160,7 +151,7 @@ export async function POST(request: Request) {
         );
       }
 
-      await prisma.user.delete({
+      await prisma().user.delete({
         where: { id: targetUserId },
       });
 

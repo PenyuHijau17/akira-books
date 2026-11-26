@@ -109,16 +109,38 @@ Setiap memulai sesi atau mengerjakan tahap/fitur baru, AI Agent **WAJIB** menjal
   - OD-01 dipertahankan: pembayaran final lebih dulu → `SUDAH_DIBAYAR`, lalu jadwal disetujui → `MENUNGGU_DIAMBIL`
   - Halaman `/admin/jadwal`, kontrol jadwal di `/pesanan/[id]`, dan tautan Header memakai `@/components/ui` serta 100% Bahasa Indonesia
   - Unit test baru `jadwal-pengambilan.test.ts` (25 test); `tsc --noEmit` 0 error dan `npm test` 17 file / 190 test PASS
+  - Telah ditinjau dan di-push (commit `0002298`)
+- Tahap 10: Pembatalan dan Pengembalian Dana/Refund (implementasi selesai, belum di-commit/di-push)
+  - Migrasi `tahap_10_pembatalan_refund` tersinkron; `prisma migrate status` up to date (10 migrasi)
+  - Customer membatalkan sebelum pembayaran final; Admin Biasa membatalkan sebelum persetujuan final dengan alasan wajib, audit, dan notifikasi
+  - Admin Utama dapat membatalkan pesanan lunas; Admin Utama tunggal wajib alasan tambahan dan dicatat di `AdminAuditLog` append-only (GR-06)
+  - `stockReserved` dilepaskan atomik & idempoten tepat 1x (`FOR UPDATE` + flag `stockReleased`), hanya untuk buku aktif; sinkron dengan auto-cancel
+  - Refund terpisah dari pembatalan: pengajuan → persetujuan Admin Utama → selesai, dengan nominal, waktu proses, metode/bukti, admin pemroses, dan dukungan refund sebagian/bertahap tanpa melebihi nominal dibayar
+  - Koreksi `SELESAI` hanya oleh Admin Utama ke status yang benar-benar tercatat di riwayat, dengan alasan wajib, audit, dan pemulihan `stockTotal`/`stockReserved` atomik
+  - Halaman `/admin/pembatalan`, `/admin/refund`, kontrol pembatalan di `/pesanan/[id]`, dan tautan Header memakai `@/components/ui` serta 100% Bahasa Indonesia
+  - Perbaikan `src/app/api/admin/route.ts`: memakai `prisma()` dari `@/lib/prisma`, tanpa `require('@prisma/client')`
+  - Unit test baru `pembatalan-refund.test.ts` (18 test); `tsc --noEmit` 0 error dan `npm test` 18 file / 208 test PASS; smoke test database nyata terverifikasi
+- Tahap 11: Penjualan Offline dan Laporan Keuangan (implementasi selesai, belum di-commit/di-push)
+  - Migrasi `20261127040000_tahap_11_penjualan_offline_laporan` diterapkan; `prisma migrate deploy` sukses (11 migrasi)
+  - Model diperluas: `OfflineSale` (status, catatan, `idempotencyKey` unik), `OfflineSaleItem` (snapshot judul/kode, subtotal) dan `OfflinePriceCorrection` (usul → persetujuan Admin Utama)
+  - Pencatatan penjualan booth langsung `SELESAI`; `stockTotal` dikurangi atomik memakai `SELECT ... FOR UPDATE` berurutan per `bookId`; idempotensi anti-duplikat klik
+  - Keranjang Customer terdampak langsung disesuaikan/dihapus dalam transaksi yang sama, dengan `needsReview`, `reviewReason`, dan notifikasi (BR-012)
+  - Koreksi harga offline: Admin Biasa/Utama mengusul wajib alasan, harga lama tetap aktif, hanya Admin Utama yang memutuskan, seluruh keputusan tercatat di `AdminAuditLog` append-only (GR-06)
+  - Laba historis memakai snapshot modal; hitung ulang memakai `costPrice` terkini; keduanya ditampilkan terpisah di laporan (BR-021/BR-022)
+  - GR-03: `saringPenjualanUntukPeran` menghapus semua field modal/laba untuk Admin Biasa; endpoint `/api/admin/laporan` mengembalikan 403 sebelum query; menu laporan hanya dirender untuk Admin Utama
+  - Dashboard `/admin/laporan` (filter harian/bulanan/tahunan WIB) dan `/admin/penjualan-offline` memakai `@/components/ui`, 100% Bahasa Indonesia; tautan Header ditambahkan sesuai peran
+  - Unit test baru: `penjualan-offline-laporan.test.ts`, `penjualan-offline-db.test.ts`, `penjualan-offline-isolasi.test.ts`, `penjualan-offline-koreksi-db.test.ts`; `tsc --noEmit` 0 error dan `npm test` 22 file / 225 test PASS
 
 ### Active
-- Tahap 9 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
+- Tahap 10 dan Tahap 11 menunggu peninjauan pemilik proyek sebelum `git commit` / `git push` (GR-07)
 
 ### Blocked
 - (none)
 
 ## 5. Implementasi Tahap Selanjutnya
 
-- **Tahap 9**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
-- **Tahap 10**: Menunggu arahan pemilik proyek setelah Tahap 9 disetujui
+- **Tahap 9**: Selesai, ditinjau, dan di-push (commit `0002298`)
+- **Tahap 10**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
+- **Tahap 11**: Implementasi selesai dan terverifikasi; menunggu peninjauan pemilik proyek (GR-07)
 
 Today's date: Mon Nov 23 2026

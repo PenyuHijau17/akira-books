@@ -222,6 +222,17 @@ model Order {
   completedById      String?     // Admin yang menekan tombol Selesai
   stockSold          Boolean     @default(false) // Idempotensi pengurangan stok saat Selesai
 
+  // ===== Tahap 10: Pembatalan, refund terpisah, dan koreksi Selesai =====
+  cancelledAt        DateTime?   // Waktu pembatalan final (BR-007)
+  cancelledById      String?     // Pelaku pembatalan
+  cancelledByRole    String?     // CUSTOMER | ADMIN_BIASA | ADMIN_UTAMA | SYSTEM
+  cancelReasonTambahan String?   // Alasan tambahan wajib untuk 1 Admin Utama yang membatalkan pesanan lunas
+  stockReleasedAt    DateTime?   // Waktu pelepasan stok tertahan (1x)
+  stockReleasedById  String?     // Pelaku pelepasan stok
+  refundNominal      Int?        // Snapshot nominal pembayaran yang menjadi dasar refund
+  koreksiSelesaiAt   DateTime?   // Waktu koreksi pesanan Selesai oleh Admin Utama
+  koreksiSelesaiById String?     // Admin Utama yang mengoreksi Selesai
+
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @default(now()) @updatedAt
 
@@ -415,20 +426,36 @@ model RefundRecord {
   processedById String
   refundedAt    DateTime    @default(now())
 
+  // ===== Tahap 10: status proses terpisah dari status pembatalan pesanan =====
+  status        String      @default("SELESAI") // MENUNGGU_PERSETUJUAN | SELESAI | DITOLAK
+  metode        String?     // TRANSFER_BANK | TUNAI | QRIS | LAINNYA
+  bukti         String?     // Referensi/bukti proses pengembalian dana
+  catatan       String?
+  approvedById  String?     // Wajib diisi Admin Utama sebelum status menjadi SELESAI
+  approvedAt    DateTime?
+  createdAt     DateTime    @default(now())
+
   // FK ke Order
   orderOrderId   String?
   // FK ke User
   processorUserId String
+
+  @@index([orderId, status])
 }
 
-// OfflineSale: penjualan langsung di booth CFD (BR-019, BR-OFF-001)
+// OfflineSale: penjualan langsung di booth CFD (BR-012, FR-OFF-001)
 model OfflineSale {
   id            String      @id @default(uuid())
   recordedById  String
   soldAt        DateTime    @default(now())
+  status        String      @default("SELESAI") // Penjualan langsung selalu Selesai
+  catatan       String?     // Catatan opsional dari admin
+  idempotencyKey String?    @unique // Anti-duplikat pencatatan (BR-008)
 
   // FK ke User
   userUserId    String
+
+  @@index([soldAt])
 }
 
 // OfflineSaleItem: item dalam penjualan offline (BR-012, BR-OFF-001)
@@ -437,13 +464,40 @@ model OfflineSaleItem {
   offlineSaleId String
   bookId        String
   quantity      Int
-  actualSellingPrice Int
-  costPrice     Int
+  actualSellingPrice Int     // Harga jual aktual (boleh beda dari katalog)
+  costPrice     Int          // Snapshot modal per unit saat transaksi (BR-021/BR-022)
+  snapshotTitle String      @default("")
+  snapshotCode  String      @default("")
+  subtotal      Int         @default(0) // quantity x actualSellingPrice
 
   // FK ke OfflineSale
   offlineSaleOfflineSaleId String
   // FK ke Book
   bookBookId     String
+
+  @@index([offlineSaleId])
+}
+
+// Usul koreksi harga penjualan offline — berlaku hanya setelah disetujui Admin Utama
+// (FR-OFF-001). Harga & laba lama tetap aktif sebelum keputusan (BR-022).
+model OfflinePriceCorrection {
+  id                String    @id @default(uuid())
+  offlineSaleId     String
+  offlineSaleItemId String
+  pengajuId         String
+  peranPengaju      String    // ADMIN_BIASA | ADMIN_UTAMA
+  hargaLama         Int
+  hargaBaru         Int
+  alasan            String    // Wajib diisi pengaju
+  status            String    @default("MENUNGGU_PERSETUJUAN")
+  // MENUNGGU_PERSETUJUAN | DISETUJUI | DITOLAK | DIBATALKAN
+  disetujuiOlehId   String?   // Admin Utama
+  disetujuiPada     DateTime?
+  alasanKeputusan   String?
+  createdAt         DateTime  @default(now())
+
+  @@index([offlineSaleId, status])
+  @@index([status])
 }
 
 // ==========================================

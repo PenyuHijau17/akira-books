@@ -265,6 +265,15 @@ const LABEL_STATUS_BUKTI: Record<string, string> = {
   TERVERIFIKASI: 'Terverifikasi',
 }
 
+const LABEL_STATUS_REFUND: Record<string, string> = {
+  TIDAK_BERLAKU: 'Tidak Berlaku',
+  PERLU_DIPROSES: 'Perlu Diproses',
+  DIKEMBALIKAN_SEBAGIAN: 'Dikembalikan Sebagian',
+  SELESAI: 'Selesai Refund',
+  MENUNGGU_PERSETUJUAN: 'Menunggu Persetujuan Admin Utama',
+  DITOLAK: 'Ditolak',
+}
+
 export function labelStatusPesanan(status: string): string {
   return LABEL_STATUS_PESANAN[status] || status
 }
@@ -275,4 +284,8 @@ export function labelStatusJadwal(status: string): string {
 
 export function labelStatusBukti(status: string): string {
   return LABEL_STATUS_BUKTI[status] || status
+}
+
+export function labelStatusRefund(status: string): string {
+  return LABEL_STATUS_REFUND[status] || status
 }
