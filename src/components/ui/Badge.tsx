@@ -18,39 +18,44 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLElement> {
 export const Badge = React.forwardRef<HTMLElement, BadgeProps>((props, ref) => {
   const variant = props.variant ?? "neutral"
 
+  // Memakai utilitas Tailwind v4 yang valid. Nama warna kustom seperti
+  // "green-800" atau deklarasi CSS "1px solid green-200" di className
+  // tidak menghasilkan CSS dan membuat badge tampil tanpa gaya.
   const variantStyles = {
     success: {
-      background: "bg-green-50",
-      color: "green-800",
-      border: "1px solid green-200",
+      background: "bg-[#E4F0E2]",
+      color: "text-[#3F6B45]",
+      border: "border border-[#BFD9BB]",
     },
     warning: {
-      background: "bg-amber-50",
-      color: "amber-800",
-      border: "1px solid amber-200",
+      background: "bg-[#F7E9D2]",
+      color: "text-[#8A5B22]",
+      border: "border border-[#E8CFA5]",
     },
     danger: {
-      background: "bg-red-50",
-      color: "red-800",
-      border: "1px solid red-200",
+      background: "bg-[#F9E3DB]",
+      color: "text-[#9A4A34]",
+      border: "border border-[#EAC3B4]",
     },
     info: {
-      background: "bg-blue-50",
-      color: "blue-800",
-      border: "1px solid blue-200",
+      background: "bg-[#E7EEF2]",
+      color: "text-[#3F5A6B]",
+      border: "border border-[#C2D3DD]",
     },
     neutral: {
-      background: "bg-gray-100",
-      color: "gray-700",
-      border: "1px solid #e5e7eb",
+      background: "bg-[#EFE7DC]",
+      color: "text-[#6B4F43]",
+      border: "border border-[#D9C9BA]",
     },
   }
 
   const style = variantStyles[variant] || variantStyles.neutral
-  const badgeClass = `
-    inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-    ${style.border} ${style.background} ${style.color}
-  `
+  const badgeClass = [
+    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium shadow-sm",
+    style.border,
+    style.background,
+    style.color,
+  ].join(" ")
 
   return (
     <span ref={ref} className={badgeClass} {...props}>

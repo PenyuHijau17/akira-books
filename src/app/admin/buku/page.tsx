@@ -12,9 +12,9 @@ export default function AdminBukuPage() {
   return (
     <Suspense
       fallback={
-        <main className="container" style={{ padding: '2rem 1rem' }}>
-          <p>Sedang menyiapkan halaman pengelolaan buku…</p>
-        </main>
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <p className="text-sm text-[#6B4F43]">Sedang menyiapkan halaman pengelolaan buku…</p>
+        </div>
       }
     >
       <AdminBukuKlien />

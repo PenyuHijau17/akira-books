@@ -1,317 +1,58 @@
 @import "tailwindcss";
 
-/* --- Variabel Tema Kertas Klasik (Krem & Cokelat) --- */
+/* ============================================================
+   Akira Books — tema "kertas klasik".
+   CATATAN PENTING: semua aturan kustom berada di dalam @layer.
+   CSS di luar layer selalu mengalahkan @layer utilities di Tailwind
+   v4, sehingga aturan lama yang tidak dilayerkan membuat warna
+   tautan, border, dan bayangan dari utilitas Tailwind tertimpa.
+   ============================================================ */
+
 :root {
-  --warna-latar: #f5f0e5;       /* Krem terang */
-  --warna-navigasi: #4d372d;    /* Cokelat tua */
-  --warna-teks-utama: #3e2723;  /* Cokelat sedang */
-  --warna-teks-second: #5d4037; /* Cokelat muda */
-  --warna-teks-link: #6d4c41;   /* Cokelat link */
-  --warna-border: #d7ccc8;      /* Krem tua border */
-  --warna-hover: #3e2723;       /* Cokelat hover */
-  --warna-succes: #8d6e63;      /* Cokelat success */
+  --warna-latar: #FAF6F0;        /* krem hangat */
+  --warna-kartu: #F3ECE1;        /* krem lembut untuk kartu sorotan */
+  --warna-navigasi: #3E2723;     /* cokelat tua */
+  --warna-aksen: #8D5B4C;        /* terakota / emas tua */
+  --warna-teks-utama: #3E2723;
+  --warna-teks-second: #6B4F43;
+  --warna-border: #E6DCD0;       /* border lembut, bukan hitam */
 }
 
-/* --- Reset & Dasar --- */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  line-height: 1.6;
-  background-color: var(--warna-latar);
-  color: var(--warna-teks-utama);
-  caret-color: var(--warna-teks-utama);
-}
-
-a:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--warna-hover);
-  outline-offset: 2px;
-}
-
-a {
-  color: var(--warna-teks-link);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-a:hover {
-  color: var(--warna-teks-utama);
-}
-
-/* --- Tombol --- */
-.btn {
-  display: inline-block;
-  padding: 0.6em 1.2em;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  line-height: 1.4;
-}
-
-.btn-primary {
-  background-color: var(--warna-navigasi);
-  color: var(--warna-latar);
-}
-
-.btn-primary:hover {
-  background-color: var(--warna-hover);
-  transform: translateY(-2px);
-}
-
-.btn-secondary {
-  background-color: var(--warna-latar);
-  color: var(--warna-navigasi);
-  border: 2px solid var(--warna-navigasi);
-}
-
-.btn-secondary:hover {
-  background-color: var(--warna-navigasi);
-  color: var(--warna-latar);
-}
-
-/* --- Tipografi --- */
-.h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--warna-navigasi);
-}
-
-.h2 {
-  font-size: 1.875rem;
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--warna-navigasi);
-}
-
-.h3 {
-  font-size: 1.375rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--warna-teks-utama);
-}
-
-.body {
-  font-size: 1rem;
-  color: var(--warna-teks-utama);
-  line-height: 1.8;
-}
-
-/* --- Navigasi & Footer --- */
-.navbar {
-  position: sticky;
-  top: 0;
-  width: 100%;
-  z-index: 1000;
-  background-color: var(--warna-navigasi);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-.navbar .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1rem 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--warna-latar);
-}
-
-.nav-links a {
-  color: var(--warna-latar);
-  margin-left: 1.5rem;
-  font-size: 0.95rem;
-  transition: color 0.2s;
-}
-
-.nav-links a:hover {
-  color: #ffb74d;
-}
-
-.footer {
-  margin-top: 4rem;
-  padding: 3rem 0;
-  background-color: var(--warna-navigasi);
-  color: var(--warna-latar);
-}
-
-.footer .container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-.footer h4 {
-  color: var(--warna-latar);
-  margin-bottom: 1rem;
-}
-
-.footer ul {
-  list-style: none;
-  padding: 0;
-}
-
-.footer li {
-  margin-bottom: 0.5rem;
-}
-
-.footer a {
-  color: #ffb74d;
-  text-decoration: none;
-}
-
-.footer a:hover {
-  color: var(--warna-latar);
-}
-
-/* --- Section Halaman Utama --- */
-.hero-section {
-  background: var(--warna-latar);
-  padding: 5rem 2rem;
-  text-align: center;
-}
-
-.hero-title {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--warna-navigasi);
-  margin-bottom: 1rem;
-}
-
-.hero-title .accent-color {
-  color: var(--warna-navigasi);
-  font-weight: 700;
-}
-
-.hero-desc {
-  font-size: 1.125rem;
-  color: var(--warna-teks-second);
-  margin-bottom: 2rem;
-}
-
-.hero-buttons .btn {
-  margin: 0 0.5rem;
-}
-
-.fitur-section {
-  background: var(--warna-latar);
-  padding: 4rem 2rem;
-}
-
-.section-header {
-  text-align: center;
-  margin-bottom: 3rem;
-  color: var(--warna-navigasi);
-}
-
-.fitur-card {
-  background: #ffffff;
-  padding: 2rem;
-  border-radius: 8px;
-  border: 1px solid var(--warna-border);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s;
-}
-
-.fitur-card:hover {
-  transform: translateY(-4px);
-}
-
-.fitur-title {
-  font-size: 1.125rem;
-  color: var(--warna-navigasi);
-  margin-bottom: 0.5rem;
-}
-
-.fitur-desc {
-  font-size: 0.95rem;
-  color: var(--warna-teks-second);
-}
-
-.hak-akses-section,
-.guest-section,
-.customer-section,
-.admin-section {
-  background: var(--warna-latar);
-  padding: 4rem 2rem;
-}
-
-.guest-section h2,
-.customer-section h2,
-.admin-section h2 {
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-.guest-section p,
-.customer-section p,
-.admin-section p {
-  text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.guest-section ul,
-.customer-section ul,
-.admin-section ul {
-  text-align: left;
-  margin: 1rem 0;
-  padding: 0;
-}
-
-.guest-section li,
-.customer-section li,
-.admin-section li {
-  margin-bottom: 0.5rem;
-}
-
-/* --- Responsif Mobile --- */
-@media (max-width: 768px) {
-  .navbar .container {
-    flex-direction: column;
-    padding: 1.25rem;
+@layer base {
+  html {
+    scroll-behavior: smooth;
   }
 
-  .navbar .logo {
-    margin-bottom: 0.75rem;
-    width: 100%;
-    text-align: center;
+  body {
+    font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    background-color: var(--warna-latar);
+    color: var(--warna-teks-utama);
+    caret-color: var(--warna-teks-utama);
   }
 
-  .nav-links {
-    width: 100%;
-    text-align: center;
+  /*
+   * Warna tautan sengaja TIDAK diatur di sini.
+   * Di Tailwind v4, selector `a` tanpa layer mengalahkan utilitas
+   * `text-[#FAF6F0]` pada navigasi/footer. Warna ditentukan per
+   * komponen memakai utilitas Tailwind.
+   */
+
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--warna-aksen);
+    outline-offset: 2px;
   }
 
-  .nav-links a {
-    display: block;
-    margin-left: 0;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(255, 183, 77, 0.3);
-  }
-
-  .h1,
-  .hero-title {
-    font-size: 1.875rem;
-  }
-
-  .h2 {
-    font-size: 1.5rem;
+  /*
+   * Tailwind v4 memakai currentColor sebagai warna border bawaan.
+   * Pengaman ini memastikan `border` tanpa warna eksplisit tetap
+   * tampil lembut, tidak berubah menjadi garis hitam.
+   * Utilitas `border-[#...]` tetap menang karena berada di layer utilities.
+   */
+  *,
+  *::before,
+  *::after {
+    border-color: var(--warna-border);
   }
 }

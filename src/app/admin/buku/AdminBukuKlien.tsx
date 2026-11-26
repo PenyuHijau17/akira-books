@@ -5,7 +5,16 @@
 // bukan dari query string. GR-03: costPrice hanya dirender untuk Admin Utama.
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertBanner, Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui'
+import {
+  AlertBanner,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Input,
+  Textarea,
+} from '@/components/ui'
 
 type Peran = 'PENGUNGGUNG' | 'CUSTOMER' | 'ADMIN_BIASA' | 'ADMIN_UTAMA'
 
@@ -56,6 +65,12 @@ const formKosong: FormBuku = {
 const rupiah = (nilai: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(nilai || 0)
 
+function varianStatus(status: string): 'success' | 'danger' | 'neutral' {
+  if (status === 'TERSEDIA') return 'success'
+  if (status === 'NONAKTIF') return 'danger'
+  return 'neutral'
+}
+
 export default function AdminBukuKlien() {
   const [peran, setPeran] = useState<Peran | null>(null)
   const [daftar, setDaftar] = useState<Buku[]>([])
@@ -99,6 +114,7 @@ export default function AdminBukuKlien() {
     setMemproses(true)
     try {
       const payload = { ...form }
+      // GR-03: Admin Biasa tidak pernah mengirim atau melihat data modal.
       if (!adalahAdminUtama) delete (payload as Partial<FormBuku>).costPrice
       const res = await fetch(menyunting ? `/api/admin/buku/${menyunting}` : '/api/admin/buku', {
         method: menyunting ? 'PUT' : 'POST',
@@ -171,20 +187,42 @@ export default function AdminBukuKlien() {
   }
 
   return (
-    <main className="container" style={{ padding: '2rem 1rem' }}>
-      <h1 style={{ marginBottom: '1rem' }}>Pengelolaan Buku</h1>
+    // Layout root sudah menyediakan <main>; pakai <div> agar tidak ada
+    // <main> bersarang yang memicu peringatan DOM nesting di dev overlay.
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:py-10">
+      <div className="mb-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8D5B4C]">
+          Panel Admin
+        </p>
+        <h1 className="mt-2 font-serif text-2xl text-[#3E2723] sm:text-3xl">
+          Pengelolaan Buku
+        </h1>
+        <p className="mt-1 text-sm text-[#6B4F43]">
+          Kelola judul, stok, dan harga jual. Data modal hanya tersedia untuk Admin Utama.
+        </p>
+      </div>
+
       {pesan && (
-        <AlertBanner type={pesan.sukses ? 'success' : 'error'}>{pesan.teks}</AlertBanner>
+        <div className="mb-6">
+          <AlertBanner type={pesan.sukses ? 'success' : 'error'}>
+            {pesan.teks}
+          </AlertBanner>
+        </div>
       )}
 
-      <Card style={{ marginTop: '1.5rem' }}>
+      <Card className="mb-6">
         <CardHeader>
-          <h2 style={{ margin: 0, fontSize: '1.1rem' }}>
-            {menyunting ? 'Ubah Buku' : 'Tambah Buku Baru'}
-          </h2>
+          <div>
+            <h2 className="font-serif text-lg text-[#3E2723]">
+              {menyunting ? 'Ubah Buku' : 'Tambah Buku Baru'}
+            </h2>
+            <p className="mt-1 text-xs text-[#6B4F43]">
+              Isi data buku lalu simpan. Kolom dengan tanda wajib diisi.
+            </p>
+          </div>
         </CardHeader>
-        <CardContent style={{ display: 'grid', gap: '0.75rem' }}>
-          <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Input label="Kode Buku" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             <Input label="Judul" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             <Input label="Penulis" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} />
@@ -193,16 +231,34 @@ export default function AdminBukuKlien() {
             <Input label="Kategori ID" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} />
             <Input label="Harga Jual" type="number" value={form.sellingPrice} onChange={(e) => setForm({ ...form, sellingPrice: Number(e.target.value) })} />
             {adalahAdminUtama && (
-              <Input label="Harga Modal (khusus Admin Utama)" type="number" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: Number(e.target.value) })} />
+              <Input
+                label="Harga Modal (khusus Admin Utama)"
+                type="number"
+                value={form.costPrice}
+                onChange={(e) => setForm({ ...form, costPrice: Number(e.target.value) })}
+              />
             )}
             <Input label="Stok Total" type="number" value={form.stockTotal} onChange={(e) => setForm({ ...form, stockTotal: Number(e.target.value) })} />
             <Input label="URL Sampul" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} />
           </div>
-          <Input label="Deskripsi" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+
+          <div className="mt-4">
+            <Textarea
+              label="Deskripsi"
+              rows={3}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-[#E6DCD0] pt-5">
             <Button onClick={simpan} isLoading={memproses}>Simpan Buku</Button>
             {menyunting && (
-              <Button variant="secondary" onClick={() => { setMenyunting(null); setForm(formKosong) }} disabled={memproses}>
+              <Button
+                variant="secondary"
+                onClick={() => { setMenyunting(null); setForm(formKosong) }}
+                disabled={memproses}
+              >
                 Batal
               </Button>
             )}
@@ -210,37 +266,70 @@ export default function AdminBukuKlien() {
         </CardContent>
       </Card>
 
-      <Card style={{ marginTop: '1.5rem' }}>
-        <CardHeader><h2 style={{ margin: 0, fontSize: '1.1rem' }}>Daftar Buku</h2></CardHeader>
+      <Card>
+        <CardHeader>
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-serif text-lg text-[#3E2723]">Daftar Buku</h2>
+              <p className="mt-1 text-xs text-[#6B4F43]">
+                {memuat ? 'Memuat judul…' : `${daftar.length} judul tercatat`}
+              </p>
+            </div>
+          </div>
+        </CardHeader>
         <CardContent>
-          {memuat && <p>Sedang memuat daftar buku…</p>}
-          {!memuat && daftar.length === 0 && <p>Belum ada buku.</p>}
+          {memuat && (
+            <p className="rounded-xl border border-dashed border-[#D9C9BA] bg-[#F3ECE1] p-6 text-center text-sm text-[#6B4F43]">
+              Sedang memuat daftar buku…
+            </p>
+          )}
+          {!memuat && daftar.length === 0 && (
+            <p className="rounded-xl border border-dashed border-[#D9C9BA] bg-[#F3ECE1] p-6 text-center text-sm text-[#6B4F43]">
+              Belum ada buku. Tambahkan judul pertama memakai formulir di atas.
+            </p>
+          )}
           {!memuat && daftar.length > 0 && (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-sm">
                 <thead>
-                  <tr>
+                  <tr className="border-b border-[#E6DCD0] bg-[#F3ECE1]">
                     {['Kode', 'Judul', 'Harga Jual', 'Stok', 'Status', 'Aksi'].map((header) => (
-                      <th key={header} style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #d7ccc8' }}>{header}</th>
+                      <th
+                        key={header}
+                        className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-[#6B4F43]"
+                      >
+                        {header}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {daftar.map((buku) => (
-                    <tr key={buku.id}>
-                      <td style={{ padding: '0.5rem' }}>{buku.code}</td>
-                      <td style={{ padding: '0.5rem' }}>{buku.title}</td>
-                      <td style={{ padding: '0.5rem' }}>{rupiah(buku.sellingPrice)}</td>
-                      <td style={{ padding: '0.5rem' }}>{buku.stockTotal}</td>
-                      <td style={{ padding: '0.5rem' }}><Badge variant="neutral">{buku.status}</Badge></td>
-                      <td style={{ padding: '0.5rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <Button variant="ghost" onClick={() => pilih(buku)} disabled={memproses}>Ubah</Button>
+                    <tr
+                      key={buku.id}
+                      className="border-b border-[#E6DCD0] transition-colors last:border-0 hover:bg-[#FAF6F0]"
+                    >
+                      <td className="px-3 py-3 font-medium text-[#3E2723]">{buku.code}</td>
+                      <td className="px-3 py-3 text-[#3E2723]">{buku.title}</td>
+                      <td className="px-3 py-3 text-[#6B4F43]">{rupiah(buku.sellingPrice)}</td>
+                      <td className="px-3 py-3 text-[#6B4F43]">{buku.stockTotal}</td>
+                      <td className="px-3 py-3">
+                        <Badge variant={varianStatus(buku.status)}>{buku.status}</Badge>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="ghost" onClick={() => pilih(buku)} disabled={memproses}>
+                            Ubah
+                          </Button>
                           {buku.status !== 'NONAKTIF' && (
-                            <Button variant="secondary" onClick={() => nonaktifkan(buku)} disabled={memproses}>Nonaktifkan</Button>
+                            <Button variant="secondary" onClick={() => nonaktifkan(buku)} disabled={memproses}>
+                              Nonaktifkan
+                            </Button>
                           )}
                           {adalahAdminUtama && (
-                            <Button variant="danger" onClick={() => hapusPermanen(buku)} disabled={memproses}>Hapus</Button>
+                            <Button variant="danger" onClick={() => hapusPermanen(buku)} disabled={memproses}>
+                              Hapus
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -252,6 +341,6 @@ export default function AdminBukuKlien() {
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   )
 }

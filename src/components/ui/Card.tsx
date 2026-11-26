@@ -14,7 +14,7 @@ export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
     return (
       <div
         ref={ref}
-        className="rounded-md bg-cream border border-border-300 p-4"
+        className="rounded-xl border border-[#E6DCD0] bg-[#FFFDF9] p-6 shadow-sm"
         {...props}
       />
     )
@@ -31,7 +31,7 @@ export const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<
     return (
       <div
         ref={ref}
-        className="flex items-start rounded-md bg-cream p-0 mb-4"
+        className="mb-5 flex items-start border-b border-[#E6DCD0] pb-4"
         {...props}
       />
     )
@@ -48,7 +48,7 @@ export const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes
     return (
       <div
         ref={ref}
-        className="flex-1 rounded-md bg-cream p-0"
+        className="flex-1"
         {...props}
       />
     )
@@ -65,7 +65,7 @@ export const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<
     return (
       <div
         ref={ref}
-        className="flex items-end rounded-md bg-cream p-0 mt-4"
+        className="mt-5 flex items-end border-t border-[#E6DCD0] pt-4"
         {...props}
       />
     )

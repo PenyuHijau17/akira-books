@@ -47,13 +47,13 @@ export const Input = (props: InputProps) => {
   } = props as InputProps & { className?: string }
 
   const baseClass =
-    "w-full rounded-md border border-border-300 bg-cream px-3 py-2 text-brown-700 placeholder:text-brown-400 small focus:outline-none focus:border-brown-600 focus:shadow-sm transition-colors"
+    "w-full rounded-lg border border-[#D9C9BA] bg-[#FFFDF9] px-3 py-2 text-sm text-[#3E2723] shadow-sm placeholder:text-[#9A8578] transition-colors focus:outline-none focus:border-[#8D5B4C] focus:ring-2 focus:ring-[#8D5B4C]/20"
   const mergedClass = className ? `${baseClass} ${className}` : baseClass
 
   return (
     <div className="space-y-1.5">
       {label && (
-        <label className="block text-small text-brown-700 mb-1">{label}</label>
+        <label className="mb-1.5 block text-xs font-semibold text-[#6B4F43]">{label}</label>
       )}
 
       {as === "select" ? (
@@ -84,13 +84,24 @@ export const Input = (props: InputProps) => {
       )}
 
       {helperText && !error && (
-        <p className="text-xs text-brown-500">{helperText}</p>
+        <p className="text-xs text-[#8D5B4C]">{helperText}</p>
       )}
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-[#9A4A34]">{error}</p>}
     </div>
   )
 }
+
+export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label?: string
+  helperText?: string
+  error?: string
+}
+
+/** Textarea — pembungkus <Input as="textarea"> dengan gaya kertas klasik. */
+export const Textarea = ({ label, helperText, error, ...rest }: TextareaProps) => (
+  <Input as="textarea" label={label} helperText={helperText} error={error} {...rest} />
+)
 
 /* Default export */
 export default Input

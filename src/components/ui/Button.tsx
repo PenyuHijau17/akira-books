@@ -1,8 +1,10 @@
 "use client"
 
 // src/components/ui/Button.tsx
-// Tombol UI dengan varian primary, secondary, danger, ghost
-// Tema kertas klasik: krem #f5f0e5, cokelat #4d372d, border #d7ccc8
+// Tombol UI dengan varian primary, secondary, danger, ghost.
+// Tema kertas klasik: krem #FAF6F0, cokelat #4A2C2A, aksen #8D5B4C.
+// CATATAN: memakai nilai arbitrary Tailwind v4, bukan nama warna kustom
+// (bg-brown-600/bg-cream) yang tidak dikenal dan tidak menghasilkan CSS.
 
 import * as React from "react"
 
@@ -12,39 +14,49 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   asChild?: boolean
 }
 
+const variants = {
+  primary:
+    "bg-[#4A2C2A] text-[#FAF6F0] shadow-sm hover:bg-[#5E3935] hover:shadow active:bg-[#35201E]",
+  secondary:
+    "border border-[#C8B6A6] bg-[#FFFDF9] text-[#4A2C2A] hover:bg-[#F3ECE1] active:bg-[#EADBC8]",
+  danger:
+    "border border-[#EAC3B4] bg-[#F9E3DB] text-[#9A4A34] hover:bg-[#F3CFC1] active:bg-[#E9B8A5]",
+  ghost:
+    "text-[#6B4F43] hover:bg-[#F3ECE1] hover:text-[#4A2C2A]",
+}
+
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>((props, ref) => {
   const variant = props.variant ?? "primary"
   const isLoading = props.isLoading ?? false
-  const asChild = props.asChild ?? false
-  const className = props.className
-
-  // Determine button classes based on variant
-  const variants = {
-    primary: "bg-brown-600 text-white hover:bg-brown-700 active:bg-brown-800",
-    secondary: "bg-cream text-brown-600 hover:bg-brown-50 active:bg-brown-100",
-    danger: "bg-red-100 text-red-800 hover:bg-red-200 active:bg-red-300",
-    ghost: "text-brown hover:bg-cream/50 hover:text-brown-800",
-  }
-
-  const getVariants = variants[variant] || variants.primary
+  const {
+    className,
+    variant: _variant,
+    isLoading: _isLoading,
+    asChild: _asChild,
+    disabled,
+    children,
+    ...rest
+  } = props
 
   return (
     <button
       ref={ref}
-      className={`
-        inline-flex items-center justify-center rounded-md 
-        font-medium transition-colors 
-        ${getVariants}
-        ${isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
-        disabled:opacity-50 disabled:cursor-not-allowed
-      `}
-      disabled={isLoading || props.disabled}
-      {...props}
+      className={[
+        "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold",
+        "transition duration-200",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8D5B4C]",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        variants[variant] ?? variants.primary,
+        isLoading ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+        className ?? "",
+      ].join(" ")}
+      disabled={isLoading || disabled}
+      {...rest}
     >
       {isLoading ? (
         <span className="flex items-center justify-center">
           <svg
-            className="animate-spin h-4 w-4 mr-2 text-white"
+            className="mr-2 h-4 w-4 animate-spin text-[#FAF6F0]"
             viewBox="0 0 24 24"
           >
             <circle
@@ -64,13 +76,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>((props, r
           Memproses...
         </span>
       ) : (
-        <span className="flex items-center justify-center">
-          {props.children}
-        </span>
+        <span className="flex items-center justify-center">{children}</span>
       )}
     </button>
   )
 })
+
+Button.displayName = "Button"
 
 /* Default export untuk kemudahan import */
 export default Button
