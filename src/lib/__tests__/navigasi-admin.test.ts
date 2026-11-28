@@ -12,8 +12,8 @@ import {
 } from '@/lib/navigasiAdmin'
 
 describe('Navigasi admin ringkas (Header + hub Penjualan)', () => {
-  it('menyediakan tujuh menu utama dan enam modul penjualan', () => {
-    expect(MENU_ADMIN).toHaveLength(7)
+  it('menyediakan delapan menu utama dan enam modul penjualan', () => {
+    expect(MENU_ADMIN).toHaveLength(8)
     expect(MODUL_PENJUALAN).toHaveLength(6)
     expect(MENU_ADMIN.map((m) => m.label)).toEqual([
       'Dashboard Admin',
@@ -23,6 +23,7 @@ describe('Navigasi admin ringkas (Header + hub Penjualan)', () => {
       'Laporan Keuangan',
       'Peringatan Notifikasi',
       'Backup & Pemulihan',
+      'Kelola Pengguna',
     ])
   })
 
@@ -33,9 +34,11 @@ describe('Navigasi admin ringkas (Header + hub Penjualan)', () => {
     expect(biasa).toHaveLength(5)
     expect(biasa).not.toContain('/admin/laporan')
     expect(biasa).not.toContain('/admin/backup')
-    expect(utama).toHaveLength(7)
+    expect(biasa).not.toContain('/admin/pengguna')
+    expect(utama).toHaveLength(8)
     expect(utama).toContain('/admin/laporan')
     expect(utama).toContain('/admin/backup')
+    expect(utama).toContain('/admin/pengguna')
 
     expect(daftarModulPenjualan('ADMIN_BIASA').map((m) => m.href)).not.toContain('/admin/qris')
     expect(daftarModulPenjualan('ADMIN_UTAMA').map((m) => m.href)).toContain('/admin/qris')

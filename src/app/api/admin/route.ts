@@ -5,17 +5,10 @@
 
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import {
-  generateOTP,
-  getSessionUser,
-  hashPassword,
-  hashToken,
-  kirimEmailKeTerminal,
-} from '@/lib/auth'
+import { getSessionUser, hashPassword } from '@/lib/auth'
 import { catatAudit } from '@/lib/pembayaranServer'
+import { konsumsiOtpAdmin, mintaOtpAdmin } from '@/lib/otpAdmin'
 
-const MASA_BERLAKU_OTP = 5 * 60 * 1000
-const MAKS_GAGAL_OTP = 5
 const AKSI_VALID = [
   'minta-otp',
   'disable-user',
@@ -26,44 +19,6 @@ const AKSI_VALID = [
 
 function gagal(pesan: string, status: number) {
   return NextResponse.json({ success: false, error: pesan }, { status })
-}
-
-/** OTP sekali pakai untuk pengelolaan akun admin (terpisah dari OTP QRIS/backup). */
-async function konsumsiOtpAdmin(
-  userId: string,
-  otp: string,
-  client: any,
-  sekarang: Date = new Date()
-): Promise<boolean> {
-  const rekaman = await client.otpAndRecoveryToken.findFirst({
-    where: {
-      userId,
-      type: 'OTP_ADMIN',
-      usedAt: null,
-      expiresAt: { gt: sekarang },
-    },
-    orderBy: { expiresAt: 'desc' },
-  })
-
-  if (!rekaman || rekaman.codeHash !== hashToken(String(otp || ''))) {
-    if (rekaman) {
-      const gagalKe = rekaman.failedAttempts + 1
-      await client.otpAndRecoveryToken.update({
-        where: { id: rekaman.id },
-        data: {
-          failedAttempts: gagalKe,
-          ...(gagalKe >= MAKS_GAGAL_OTP ? { usedAt: sekarang } : {}),
-        },
-      })
-    }
-    return false
-  }
-
-  const dikonsumsi = await client.otpAndRecoveryToken.updateMany({
-    where: { id: rekaman.id, usedAt: null },
-    data: { usedAt: sekarang },
-  })
-  return dikonsumsi.count === 1
 }
 
 // GET: daftar user berdasarkan peran — otorisasi server-side (GR-02).
@@ -120,40 +75,9 @@ export async function POST(request: Request) {
       if (user.role !== 'ADMIN_UTAMA') {
         return gagal('Hanya Admin Utama yang dapat meminta OTP ini', 403)
       }
-      const sekarang = new Date()
-      const aktif = await prisma().otpAndRecoveryToken.findFirst({
-        where: {
-          userId: user.id,
-          type: 'OTP_ADMIN',
-          usedAt: null,
-          expiresAt: { gt: sekarang },
-        },
-        orderBy: { expiresAt: 'desc' },
-      })
-      if (aktif && aktif.expiresAt.getTime() - sekarang.getTime() > 60_000) {
-        return gagal('OTP masih berlaku. Tunggu maksimal 1 menit sebelum meminta ulang.', 429)
-      }
-
-      const otp = generateOTP()
-      await prisma().otpAndRecoveryToken.create({
-        data: {
-          userId: user.id,
-          userUserId: user.id,
-          codeHash: hashToken(otp),
-          type: 'OTP_ADMIN',
-          failedAttempts: 0,
-          expiresAt: new Date(sekarang.getTime() + MASA_BERLAKU_OTP),
-        },
-      })
-      kirimEmailKeTerminal(
-        user.email,
-        'OTP Pengelolaan Akun Admin Akira Books',
-        `Kode OTP: ${otp}. Berlaku 5 menit. Jangan bagikan kepada pihak lain.`
-      )
-      return NextResponse.json({
-        success: true,
-        pesan: 'OTP dikirim ke terminal server dan berlaku selama 5 menit.',
-      })
+      const hasil = await mintaOtpAdmin(user.id, user.email)
+      if (!hasil.ok) return gagal(hasil.pesan, hasil.status)
+      return NextResponse.json({ success: true, pesan: hasil.pesan })
     }
 
     const otp = String(body?.otp || '')

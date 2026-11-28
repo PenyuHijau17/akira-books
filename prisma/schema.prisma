@@ -31,6 +31,7 @@ model User {
   isActive      Boolean     @default(true)
   deactivationReason String?
   deletionRequestedAt DateTime?
+  createdAt         DateTime    @default(now()) // Tanggal daftar akun (dipakai panel Kelola Pengguna)
 
   // FK fields (hanya sekali didefinisikan, tanpa @relation opposite validation)
   sessionUserId String?     // FK ke Session

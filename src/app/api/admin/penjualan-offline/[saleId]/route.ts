@@ -13,7 +13,7 @@ import {
   auditPenjualan,
   saringPenjualanUntukPeran,
 } from '@/lib/penjualanServer'
-import { notifikasiAdmins } from '@/lib/pembayaranServer'
+import { notifikasiAdminBiasa, notifikasiAdmins } from '@/lib/pembayaranServer'
 
 function gagal(pesan: string, status: number) {
   return NextResponse.json({ error: pesan }, { status })
@@ -213,9 +213,12 @@ export async function POST(
           },
           reason: alasan || null,
         })
-        await notifikasiAdmins({
+        // Hasil keputusan hanya untuk Admin Biasa (pengusul/operasional).
+        // Admin Utama tidak menerima notifikasi hasil atas tindakannya sendiri.
+        await notifikasiAdminBiasa({
           groupKey: `koreksi-offline:keputusan:${koreksi.id}:${sekarang.getTime()}`,
           message: `Koreksi harga penjualan offline ${disetujui ? 'disetujui' : 'ditolak'} Admin Utama. Harga yang berlaku: ${hargaBerlaku}.${alasan ? ` Alasan: ${alasan}` : ''}`,
+          pengajuId: koreksi.pengajuId,
           client: tx,
         })
 

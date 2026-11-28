@@ -44,13 +44,19 @@ async function kirim(
 
 describe('Tahap 11 — usul & persetujuan koreksi harga offline (database nyata, GR-06)', () => {
   const unik = Date.now().toString(36)
-  const dibersihkan: { koreksiIds: string[]; saleId?: string } = {
+  const dibersihkan: { koreksiIds: string[]; saleId?: string; userIds: string[] } = {
     koreksiIds: [],
+    userIds: [],
   }
 
   afterAll(async () => {
     // AdminAuditLog sengaja tidak dihapus: GR-06 bersifat append-only, termasuk di database.
     const db = prisma()
+    if (dibersihkan.userIds.length > 0) {
+      await db.notificationOutbox
+        .deleteMany({ where: { userId: { in: dibersihkan.userIds } } })
+        .catch(() => undefined)
+    }
     if (dibersihkan.koreksiIds.length > 0) {
       await db.notification
         .deleteMany({
@@ -58,6 +64,7 @@ describe('Tahap 11 — usul & persetujuan koreksi harga offline (database nyata,
             OR: dibersihkan.koreksiIds.flatMap((id) => [
               { groupKey: { contains: `koreksi-offline:usul:${id}` } },
               { groupKey: { contains: `koreksi-offline:keputusan:${id}` } },
+              { groupKey: { contains: `koreksi-offline:KOREKSI_OFFLINE:${id}` } },
             ]),
           },
         })
@@ -97,6 +104,7 @@ describe('Tahap 11 — usul & persetujuan koreksi harga offline (database nyata,
         role: 'ADMIN_UTAMA',
       },
     })
+    dibersihkan.userIds.push(adminBiasa.id, adminUtama.id)
     const kategori = await db.category.create({ data: { name: `Koreksi11-${unik}` } })
     const buku = await db.book.create({
       data: {
@@ -202,6 +210,21 @@ describe('Tahap 11 — usul & persetujuan koreksi harga offline (database nyata,
       'SETUJUI_KOREKSI_HARGA_OFFLINE',
     ])
     expect(semuaAudit[1].actorRoleSnapshot).toBe('ADMIN_UTAMA')
+
+    // Hasil keputusan hanya masuk ke Admin Biasa (pengusul), bukan ke Admin Utama.
+    const kunciHasil = `koreksi-offline:KOREKSI_OFFLINE:${usul.isi.hasil.koreksiId}`
+    const notifikasiBiasa = await db.notification.findMany({
+      where: { userId: adminBiasa.id, groupKey: kunciHasil },
+    })
+    expect(notifikasiBiasa).toHaveLength(1)
+    expect(notifikasiBiasa[0].message).toContain('disetujui Admin Utama')
+
+    const notifikasiUtama = await db.notification.findMany({
+      where: { userId: adminUtama.id, groupKey: kunciHasil },
+    })
+    expect(
+      notifikasiUtama.some((n) => n.message.includes('disetujui Admin Utama'))
+    ).toBe(false)
 
     const usulKedua = await kirim(
       sale.id,

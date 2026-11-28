@@ -2,7 +2,7 @@
 
 // src/components/Header.tsx
 // Navigasi utama dengan status login nyata (membaca /api/auth).
-// MENU ADMIN diringkas jadi 7 item di desktop; pada mobile diganti FAB yang
+// MENU ADMIN diringkas jadi 8 item di desktop; pada mobile diganti FAB yang
 // membuka panel cepat berisi seluruh menu + enam modul Penjualan.
 // Otorisasi tetap di server (GR-02); daftar ini hanya pengelompokan UI.
 
@@ -218,7 +218,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Baris MENU ADMIN desktop: 7 item, satu baris (bisa digeser jika sempit).
+        {/* Baris MENU ADMIN desktop: 8 item, satu baris (bisa digeser jika sempit).
             Ini tampilan saja; pembatasan akses tetap di server (GR-02). */}
         {adalahAdmin && (
           <div className="hidden border-t border-white/10 py-2 md:block">

@@ -117,13 +117,15 @@ describe('Dashboard Admin — pintasan cepat', () => {
     }
   })
 
-  it('hanya menampilkan laporan & backup untuk Admin Utama', () => {
+  it('hanya menampilkan laporan, backup, dan kelola pengguna untuk Admin Utama', () => {
     const biasa = daftarPintasanAdmin('ADMIN_BIASA').map((item) => item.href)
     const utama = daftarPintasanAdmin('ADMIN_UTAMA').map((item) => item.href)
     expect(biasa).not.toContain('/admin/laporan')
     expect(biasa).not.toContain('/admin/backup')
+    expect(biasa).not.toContain('/admin/pengguna')
     expect(utama).toContain('/admin/laporan')
     expect(utama).toContain('/admin/backup')
+    expect(utama).toContain('/admin/pengguna')
     expect(JSON.stringify(biasa)).not.toContain('laba')
   })
 

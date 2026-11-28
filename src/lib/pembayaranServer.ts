@@ -190,6 +190,37 @@ export async function notifikasiAdmins(params: {
   return admins.length
 }
 
+/**
+ * Hasil keputusan koreksi harga ditujukan hanya ke sisi operasional (Admin Biasa).
+ * Admin Utama yang memutus tidak perlu menerima notifikasi hasilnya (GR-02).
+ */
+export async function notifikasiAdminBiasa(params: {
+  groupKey: string
+  message: string
+  pengajuId?: string | null
+  client?: Parameters<typeof buatNotifikasi>[0]['client']
+}) {
+  const client = params.client ?? prisma()
+  const admins: Array<{ id: string }> = await client.user.findMany({
+    where: { role: 'ADMIN_BIASA', isActive: true },
+    select: { id: true },
+  })
+  const pengaju = params.pengajuId
+  const penerima =
+    pengaju && admins.some((admin) => admin.id === pengaju)
+      ? admins.filter((admin) => admin.id === pengaju)
+      : admins
+  for (const admin of penerima) {
+    await buatNotifikasi({
+      userId: admin.id,
+      groupKey: `${params.groupKey}:${admin.id}`,
+      message: params.message,
+      client,
+    })
+  }
+  return penerima.length
+}
+
 export async function buatReminder(params: {
   orderId: string
   type: 'PENGINGAT_BUKTI' | 'PENGINGAT_PUTUSAN' | 'PENGINGAT_JADWAL'

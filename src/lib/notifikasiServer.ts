@@ -23,6 +23,7 @@ import type {
 } from '@/lib/inboxNotifikasi'
 import { simpanNotifikasiBaku } from '@/lib/notifikasiPenyimpanan'
 import { kelompokkanNotifikasiMenjadiKartu } from '@/lib/notifikasiKartu'
+import { bersihkanPesanNotifikasi } from '@/lib/notifikasiKunci'
 
 type Klien = any
 
@@ -36,6 +37,79 @@ const FIELD_KEUANGAN_TAMBAHAN = new Set([
   'selisih',
   'modal',
 ])
+
+const AWALAN_SISTEM = ['outbox:', 'sistem:', 'toko:']
+
+type BarisSistemRingkas = { kategori?: string | null; groupKey?: string | null }
+type FilterSistemRingkas = {
+  OR: Array<{ kategori: string } | { groupKey: { startsWith: string } }>
+}
+type BarisHitunganNotifikasi = { userId: string; _count?: { _all?: number } | null }
+type BarisCuplikanNotifikasi = {
+  userId: string
+  message: string | null
+  createdAt: Date
+  kategori?: string | null
+  groupKey?: string | null
+}
+type InfoUserRingkas = {
+  id: string
+  name: string | null
+  avatarUrl: string | null
+  role: string
+}
+
+function adalahNotifikasiSistem(baris: BarisSistemRingkas): boolean {
+  const kategori = String(baris.kategori || '').toUpperCase()
+  const kunci = String(baris.groupKey || '').toLowerCase()
+  return kategori === 'SISTEM' || AWALAN_SISTEM.some((awalan) => kunci.startsWith(awalan))
+}
+
+/** Filter sistem dipakai bersama untuk query daftar, hitungan, dan penandaan baca. */
+function filterNotifikasiSistem(): FilterSistemRingkas {
+  return {
+    OR: [
+      { kategori: 'SISTEM' },
+      ...AWALAN_SISTEM.map((awalan) => ({ groupKey: { startsWith: awalan } })),
+    ],
+  }
+}
+
+const PERAN_NOTIFIKASI_VALID = new Set(['CUSTOMER', 'ADMIN_BIASA', 'ADMIN_UTAMA'])
+
+/** Akun yang bisa dijadikan kartu daftar: aktif, bernama, dan perannya dikenal. */
+function userNotifikasiValid(user: InfoUserRingkas | undefined): boolean {
+  return Boolean(
+    user && String(user.name || '').trim() && PERAN_NOTIFIKASI_VALID.has(user.role)
+  )
+}
+
+/**
+ * Panel Sistem Toko juga menampung notifikasi operasional yang user-nya sudah
+ * tidak ada / tidak aktif / tanpa nama (yatim), agar tidak muncul kartu phantom.
+ */
+function filterPanelSistem(userIdsYatim: string[]): Record<string, unknown> {
+  const atau: Array<Record<string, unknown>> = [
+    { kategori: 'SISTEM' },
+    ...AWALAN_SISTEM.map((awalan) => ({ groupKey: { startsWith: awalan } })),
+  ]
+  if (userIdsYatim.length > 0) atau.push({ userId: { in: userIdsYatim } })
+  return { OR: atau }
+}
+
+/** Daftar userId yatim yang notifikasinya harus masuk kelompok Sistem Toko. */
+export async function daftarUserIdNotifikasiYatim(client?: Klien): Promise<string[]> {
+  const db = client ?? prisma()
+  const grup: BarisHitunganNotifikasi[] = await db.notification.groupBy({ by: ['userId'] })
+  const ids = grup.map((baris) => baris.userId).filter(Boolean)
+  if (ids.length === 0) return []
+  const users: InfoUserRingkas[] = await db.user.findMany({
+    where: { id: { in: ids }, isActive: true },
+    select: { id: true, name: true, avatarUrl: true, role: true },
+  })
+  const valid = new Set(users.filter(userNotifikasiValid).map((user) => user.id))
+  return ids.filter((id) => !valid.has(id))
+}
 
 /** GR-03: buang modal/laba secara rekursif sebelum payload dikirim ke Admin Biasa/Customer. */
 export function saringNotifikasiUntukPeran<T>(data: T, peran: string | null | undefined): T {
@@ -122,17 +196,22 @@ export async function daftarNotifikasiPengguna(args: {
   limit?: number
   client?: Klien
   tanpaKonteks?: boolean
+  sistemSaja?: boolean
+  sistemUserIds?: string[]
 }) {
   const client = args.client ?? prisma()
   const batas = Math.min(Math.max(1, Number(args.limit) || 100), 200)
+  const where: Record<string, unknown> = args.sistemSaja
+    ? filterPanelSistem(args.sistemUserIds || [])
+    : { userId: args.userId }
 
   const [baris, belumDibaca] = await Promise.all([
     client.notification.findMany({
-      where: { userId: args.userId },
+      where,
       orderBy: { createdAt: 'desc' },
       take: batas,
     }),
-    client.notification.count({ where: { userId: args.userId, isRead: false } }),
+    client.notification.count({ where: { ...where, isRead: false } }),
   ])
 
   const daftar = (baris as Array<any>).map((n) => ({
@@ -180,10 +259,14 @@ export async function tandaiNotifikasiDibaca(args: {
   userId: string
   ids?: string[]
   semua?: boolean
+  sistemSaja?: boolean
+  sistemUserIds?: string[]
   client?: Klien
 }): Promise<number> {
   const client = args.client ?? prisma()
-  const where: any = { userId: args.userId, isRead: false }
+  const where: Record<string, unknown> = args.sistemSaja
+    ? { ...filterPanelSistem(args.sistemUserIds || []), isRead: false }
+    : { userId: args.userId, isRead: false }
   if (!args.semua) {
     const ids = (args.ids || []).map(String).filter(Boolean)
     if (ids.length === 0) return 0
@@ -194,6 +277,167 @@ export async function tandaiNotifikasiDibaca(args: {
     data: { isRead: true, readAt: new Date() },
   })
   return hasil.count
+}
+
+export type AkunNotifikasiRingkas = {
+  id: string
+  nama: string
+  avatarUrl: string | null
+  peran: string
+  cuplikan: string | null
+  waktuTerbaru: string | null
+  belumDibaca: number
+  total: number
+  sistem: boolean
+}
+
+/**
+ * Level 1 — daftar akun untuk Admin. Notifikasi sistem dipisah menjadi satu
+ * kelompok "Sistem Toko" agar tidak menggandakan baris pada akun pemiliknya.
+ * GR-02: hanya Admin yang boleh memanggil; GR-03: payload disaring per peran.
+ */
+export async function daftarAkunNotifikasi(args: {
+  peran: string | null | undefined
+  client?: Klien
+}): Promise<{ akun: AkunNotifikasiRingkas[] }> {
+  const client = args.client ?? prisma()
+  const admin = args.peran === 'ADMIN_UTAMA' || args.peran === 'ADMIN_BIASA'
+  if (!admin) return { akun: [] }
+
+  const filterSistem = filterNotifikasiSistem()
+  const [ringkasan, belum, sistemRingkasan, sistemBelum] = await Promise.all([
+    client.notification.groupBy({ by: ['userId'], _count: { _all: true } }),
+    client.notification.groupBy({
+      by: ['userId'],
+      where: { isRead: false },
+      _count: { _all: true },
+    }),
+    client.notification.groupBy({ by: ['userId'], where: filterSistem, _count: { _all: true } }),
+    client.notification.groupBy({
+      by: ['userId'],
+      where: { ...filterSistem, isRead: false },
+      _count: { _all: true },
+    }),
+  ])
+
+  const hitungan = (daftar: BarisHitunganNotifikasi[]) =>
+    new Map(daftar.map((baris) => [baris.userId, Number(baris._count?._all) || 0]))
+  const petaBelum = hitungan(belum as BarisHitunganNotifikasi[])
+  const petaSistem = hitungan(sistemRingkasan as BarisHitunganNotifikasi[])
+  const petaSistemBelum = hitungan(sistemBelum as BarisHitunganNotifikasi[])
+
+  const ids = (ringkasan as BarisHitunganNotifikasi[])
+    .map((baris) => baris.userId)
+    .filter(Boolean)
+  const yatim = await daftarUserIdNotifikasiYatim(client)
+  const yatimSet = new Set(yatim)
+  const idsValid = ids.filter((id) => !yatimSet.has(id))
+
+  const [users, semuaBaris, sistemTerbaru] = await Promise.all([
+    idsValid.length
+      ? client.user.findMany({
+          where: { id: { in: idsValid }, isActive: true },
+          select: { id: true, name: true, avatarUrl: true, role: true },
+        })
+      : [],
+    ids.length
+      ? client.notification.findMany({
+          where: { userId: { in: ids } },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            userId: true,
+            message: true,
+            createdAt: true,
+            kategori: true,
+            groupKey: true,
+          },
+          take: 1000,
+        })
+      : [],
+    client.notification.findFirst({
+      where: filterPanelSistem(yatim),
+      orderBy: { createdAt: 'desc' },
+      select: { message: true, createdAt: true },
+    }),
+  ])
+
+  const petaUser = new Map(
+    (users as InfoUserRingkas[])
+      .filter((user) => userNotifikasiValid(user))
+      .map((user) => [user.id, user])
+  )
+  const terbaru = new Map<string, BarisCuplikanNotifikasi>()
+  for (const baris of semuaBaris as BarisCuplikanNotifikasi[]) {
+    if (adalahNotifikasiSistem(baris)) continue
+    if (!terbaru.has(baris.userId)) terbaru.set(baris.userId, baris)
+  }
+
+  const cuplikanPesan = (pesan: string | null | undefined) => {
+    const bersih = bersihkanPesanNotifikasi(pesan)
+    return bersih ? (bersih.length > 70 ? `${bersih.slice(0, 67)}…` : bersih) : null
+  }
+
+  const akunUser: AkunNotifikasiRingkas[] = (ringkasan as BarisHitunganNotifikasi[])
+    .filter((baris) => petaUser.has(baris.userId))
+    .map((baris): AkunNotifikasiRingkas => {
+      const user = petaUser.get(baris.userId)!
+      const sistemCount = petaSistem.get(baris.userId) || 0
+      const sistemUnread = petaSistemBelum.get(baris.userId) || 0
+      const barisTerbaru = terbaru.get(baris.userId)
+      return {
+        id: baris.userId,
+        nama: String(user.name).trim(),
+        avatarUrl: user.avatarUrl ?? null,
+        peran: user.role,
+        cuplikan: cuplikanPesan(barisTerbaru?.message),
+        waktuTerbaru: barisTerbaru?.createdAt
+          ? new Date(barisTerbaru.createdAt).toISOString()
+          : null,
+        belumDibaca: Math.max(0, (petaBelum.get(baris.userId) || 0) - sistemUnread),
+        total: Math.max(0, (Number(baris._count?._all) || 0) - sistemCount),
+        sistem: false,
+      }
+    })
+    .filter((akun) => akun.total > 0 || akun.belumDibaca > 0)
+
+  // Notifikasi yatim tidak layak menjadi kartu akun; hitungannya pindah ke Sistem Toko.
+  // Bagian sistem sudah dihitung terpisah, jadi hanya ambil sisa di luar filter sistem.
+  const sisaYatim = (
+    daftar: BarisHitunganNotifikasi[],
+    petaSistem: Map<string, number>
+  ): number =>
+    daftar
+      .filter((baris) => yatimSet.has(baris.userId))
+      .reduce(
+        (jumlah, baris) =>
+          jumlah +
+          Math.max(0, (Number(baris._count?._all) || 0) - (petaSistem.get(baris.userId) || 0)),
+        0
+      )
+
+  const akunSistem: AkunNotifikasiRingkas = {
+    id: '__sistem__',
+    nama: 'Sistem Toko',
+    avatarUrl: null,
+    peran: 'SISTEM',
+    cuplikan: cuplikanPesan(sistemTerbaru?.message),
+    waktuTerbaru: sistemTerbaru?.createdAt
+      ? new Date(sistemTerbaru.createdAt).toISOString()
+      : null,
+    belumDibaca:
+      (sistemBelum as BarisHitunganNotifikasi[]).reduce(
+        (jumlah, baris) => jumlah + (Number(baris._count?._all) || 0),
+        0
+      ) + sisaYatim(belum as BarisHitunganNotifikasi[], petaSistemBelum),
+    total:
+      (sistemRingkasan as BarisHitunganNotifikasi[]).reduce(
+        (jumlah, baris) => jumlah + (Number(baris._count?._all) || 0),
+        0
+      ) + sisaYatim(ringkasan as BarisHitunganNotifikasi[], petaSistem),
+    sistem: true,
+  }
+
+  return saringNotifikasiUntukPeran({ akun: [...akunUser, akunSistem] }, args.peran)
 }
 
 /** Eksternal hanya abstraksi log-terminal sesuai OD-04; tidak menambah layanan (GR-01). */

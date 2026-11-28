@@ -99,6 +99,7 @@ const PINTASAN_BERSAMA: PintasanAdmin[] = [
 const PINTASAN_ADMIN_UTAMA: PintasanAdmin[] = [
   { href: '/admin/laporan', label: 'Laporan Keuangan', deskripsi: 'Ringkasan penjualan dan laba (Admin Utama)' },
   { href: '/admin/backup', label: 'Backup & Pemulihan', deskripsi: 'Arsip terenkripsi dan uji pulihkan data' },
+  { href: '/admin/pengguna', label: 'Kelola Pengguna', deskripsi: 'Akun, peran, dan status seluruh pengguna' },
 ]
 
 /** Pintasan quick actions; laporan & backup hanya untuk Admin Utama. */

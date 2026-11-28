@@ -91,6 +91,12 @@ export const MENU_ADMIN: TautanAdmin[] = [
     deskripsi: 'Arsip terenkripsi dan uji pemulihan data.',
     hanyaUtama: true,
   },
+  {
+    href: '/admin/pengguna',
+    label: 'Kelola Pengguna',
+    deskripsi: 'Daftar akun, peran, dan status pengguna toko.',
+    hanyaUtama: true,
+  },
 ]
 
 export function adalahRoleAdmin(role: unknown): role is RoleAdmin {
