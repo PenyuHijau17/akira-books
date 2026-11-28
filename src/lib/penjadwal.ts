@@ -17,6 +17,7 @@ import {
   selesaikanReminder,
 } from '@/lib/pembayaranServer'
 import { enqueueOutbox, jalankanOutbox } from '@/lib/notifikasiServer'
+import { kunciBakuNotifikasi } from '@/lib/notifikasiKunci'
 import { jalankanBackupHarian } from '@/lib/backupServer'
 import {
   jenisPengingatValid,
@@ -392,7 +393,14 @@ export async function jalankanPengingat(sekarang: Date = new Date()): Promise<nu
     }
 
     for (const penerimaItem of penerima) {
-      const kunci = `${groupKey}:${penerimaItem.id}`
+      // Kunci kanonik tidak memuat langkah 2 jam maupun id penerima, sehingga
+      // pengingat berikutnya menimpa baris yang sama (bukan menambah baris baru).
+      const kunci = kunciBakuNotifikasi({
+        groupKey: `${groupKey}:${penerimaItem.id}`,
+        kategori,
+        entitasId: order.id,
+        userId: penerimaItem.id,
+      }).groupKey
       const dibuat = await buatNotifikasi({
         userId: penerimaItem.id,
         groupKey: kunci,

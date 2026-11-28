@@ -8,10 +8,12 @@ import { useEffect, useState } from 'react'
 import { AlertBanner, Badge } from '@/components/ui'
 import BannerCarousel from '@/components/BannerCarousel'
 import { formatRupiah, toWIBString } from '@/lib/timezone'
+import { slugBuku } from '@/lib/slugBuku'
 
 type BukuEtalase = {
   id: string
   code: string
+  slug?: string
   title: string
   author: string
   imageUrl?: string | null
@@ -368,7 +370,9 @@ export default function Page() {
               return (
                 <a
                   key={buku.id}
-                  href={`/katalog/${encodeURIComponent(buku.code)}`}
+                  href={`/katalog/${encodeURIComponent(
+                    buku.slug || slugBuku(buku.title, buku.code) || buku.code
+                  )}`}
                   className="group flex flex-col rounded-xl border border-[#E6DCD0] bg-white/80 p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-[#C8A46A] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8D5B4C]"
                 >
                   <div className="aspect-[3/4] w-full overflow-hidden rounded-lg border border-[#E6DCD0] bg-[#EFE4D2]">

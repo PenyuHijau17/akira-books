@@ -11,6 +11,8 @@ import * as React from "react"
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger" | "ghost"
   isLoading?: boolean
+  /** Teks saat isLoading; default "Memproses...". */
+  loadingText?: string
   asChild?: boolean
 }
 
@@ -32,6 +34,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>((props, r
     className,
     variant: _variant,
     isLoading: _isLoading,
+    loadingText = "Memproses...",
     asChild: _asChild,
     disabled,
     children,
@@ -73,7 +76,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>((props, r
               d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
             />
           </svg>
-          Memproses...
+          {loadingText}
         </span>
       ) : (
         <span className="flex items-center justify-center">{children}</span>

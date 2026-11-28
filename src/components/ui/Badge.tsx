@@ -16,7 +16,14 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLElement> {
 }
 
 export const Badge = React.forwardRef<HTMLElement, BadgeProps>((props, ref) => {
-  const variant = props.variant ?? "neutral"
+  // Prop kustom `variant` sengaja dibuang sebelum spread ke <span>,
+  // agar React tidak meneruskannya sebagai atribut DOM yang tidak valid.
+  const {
+    variant = "neutral",
+    className,
+    children,
+    ...rest
+  } = props
 
   // Memakai utilitas Tailwind v4 yang valid. Nama warna kustom seperti
   // "green-800" atau deklarasi CSS "1px solid green-200" di className
@@ -55,11 +62,12 @@ export const Badge = React.forwardRef<HTMLElement, BadgeProps>((props, ref) => {
     style.border,
     style.background,
     style.color,
+    className ?? "",
   ].join(" ")
 
   return (
-    <span ref={ref} className={badgeClass} {...props}>
-      {props.children}
+    <span ref={ref} className={badgeClass} {...rest}>
+      {children}
     </span>
   )
 })

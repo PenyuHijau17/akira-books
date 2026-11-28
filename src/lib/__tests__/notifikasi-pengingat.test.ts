@@ -93,7 +93,7 @@ describe('Tahap 12 — pengingat persisten 2 jam', () => {
         where: { userId: admin.id, message: { contains: unik } },
       })
       expect(notifPertama).toHaveLength(1)
-      expect(notifPertama[0].groupKey).toContain(':1')
+      expect(notifPertama[0].groupKey).toBe(`pengingat:PENGINGAT_BUKTI:${order.id}`)
       expect((await db.order.findUnique({ where: { id: order.id } }))?.reminderStep).toBe(1)
 
       // Dipanggil lagi pada waktu yang sama: belum jatuh tempo, tidak mengirim ganda.
@@ -101,13 +101,14 @@ describe('Tahap 12 — pengingat persisten 2 jam', () => {
       expect(await db.notification.count({ where: { userId: admin.id, message: { contains: unik } } })).toBe(1)
 
       // Simulasikan restart: proses baru membaca antrean dari database.
+      // Pengingat berikutnya menimpa baris yang sama, bukan menambah baris baru.
       const setelahRestart = await jalankanPengingat(new Date(t0.getTime() + 2 * 60 * 60 * 1000))
       expect(setelahRestart).toBeGreaterThanOrEqual(1)
       const notifKedua = await db.notification.findMany({
         where: { userId: admin.id, message: { contains: unik } },
       })
-      expect(notifKedua).toHaveLength(2)
-      expect(notifKedua.some((n) => n.groupKey.includes(':2'))).toBe(true)
+      expect(notifKedua).toHaveLength(1)
+      expect(notifKedua[0].groupKey).toBe(`pengingat:PENGINGAT_BUKTI:${order.id}`)
       const antrean = await db.scheduledReminder.findUnique({ where: { id: reminder.id } })
       expect(antrean?.terakhirDijalankan?.getTime()).toBe(t0.getTime() + 2 * 60 * 60 * 1000)
 
@@ -118,7 +119,7 @@ describe('Tahap 12 — pengingat persisten 2 jam', () => {
       })
       await jalankanPengingat(new Date(t0.getTime() + 4 * 60 * 60 * 1000))
       expect((await db.scheduledReminder.findUnique({ where: { id: reminder.id } }))?.isResolved).toBe(true)
-      expect(await db.notification.count({ where: { userId: admin.id, message: { contains: unik } } })).toBe(2)
+      expect(await db.notification.count({ where: { userId: admin.id, message: { contains: unik } } })).toBe(1)
     } finally {
       await db.notification.deleteMany({ where: { message: { contains: unik } } })
       await db.notificationOutbox.deleteMany({ where: { message: { contains: unik } } })

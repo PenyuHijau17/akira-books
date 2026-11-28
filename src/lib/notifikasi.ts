@@ -46,11 +46,26 @@ export function kategoriDariKunci(groupKey: string | null | undefined): Kategori
   const kunci = String(groupKey || '')
   if (kunci.startsWith('jadwal:') || kunci.startsWith('pengingat:PENGINGAT_JADWAL')) return 'JADWAL'
   if (kunci.startsWith('pengingat:')) return 'PEMBAYARAN'
-  if (kunci.startsWith('auto-cancel:') || kunci.startsWith('refund:')) return 'PEMBAYARAN'
-  if (kunci.startsWith('pembayaran:') || kunci.startsWith('bukti:')) return 'PEMBAYARAN'
+  if (
+    kunci.startsWith('auto-cancel:') ||
+    kunci.startsWith('refund:') ||
+    kunci.startsWith('pembayaran:') ||
+    kunci.startsWith('bukti:') ||
+    kunci.startsWith('putusan:') ||
+    kunci.startsWith('metode:') ||
+    kunci.startsWith('tenggat:') ||
+    kunci.startsWith('qris:')
+  )
+    return 'PEMBAYARAN'
   if (kunci.startsWith('koreksi-offline:') || kunci.startsWith('penjualan:')) return 'PENJUALAN'
-  if (kunci.startsWith('keranjang:') || kunci.startsWith('pesanan:')) return 'PESANAN'
-  if (kunci.startsWith('sistem:')) return 'SISTEM'
+  if (
+    kunci.startsWith('keranjang:') ||
+    kunci.startsWith('pesanan:') ||
+    kunci.startsWith('pembatalan:')
+  )
+    return 'PESANAN'
+  if (kunci.startsWith('outbox:') || kunci.startsWith('sistem:') || kunci.startsWith('toko:'))
+    return 'SISTEM'
   return 'UMUM'
 }
 
@@ -131,4 +146,125 @@ export function formatWaktuWIB(tanggal: Date | string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(nilai)
+}
+
+// ==========================================
+// Tampilan inbox: kelompok tanggal & tautan pesanan
+// ==========================================
+
+export type GrupTanggalNotifikasi = {
+  kunci: 'HARI_INI' | 'KEMARIN' | 'SEBELUMNYA'
+  label: 'Hari Ini' | 'Kemarin' | 'Sebelumnya'
+  jumlah: number
+  belumDibaca: number
+  items: NotifikasiItem[]
+}
+
+const formatterHariWIB = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Jakarta',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+function kunciHariWIB(nilai: Date): string {
+  return formatterHariWIB.format(nilai)
+}
+
+function hariSebelumnyaWIB(nilai: Date): string {
+  const bagian = kunciHariWIB(nilai).split('-').map(Number)
+  return kunciHariWIB(new Date(Date.UTC(bagian[0], bagian[1] - 1, bagian[2] - 1)))
+}
+
+/**
+ * Kelompokkan inbox berdasarkan hari WIB agar tidak ada judul generik "Lainnya".
+ * Detail tiap notifikasi tetap dipertahankan di `items` (NFR-01).
+ */
+export function kelompokkanNotifikasiPerTanggal(
+  daftar: NotifikasiItem[],
+  sekarang: Date = new Date()
+): GrupTanggalNotifikasi[] {
+  const hariIni = kunciHariWIB(sekarang)
+  const kemarin = hariSebelumnyaWIB(sekarang)
+
+  const terurut = [...daftar].sort((a, b) => waktu(b) - waktu(a))
+  const peta = new Map<GrupTanggalNotifikasi['kunci'], GrupTanggalNotifikasi>()
+
+  for (const item of terurut) {
+    const kunciHari = kunciHariWIB(
+      item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt)
+    )
+    const kunci: GrupTanggalNotifikasi['kunci'] =
+      kunciHari === hariIni ? 'HARI_INI' : kunciHari === kemarin ? 'KEMARIN' : 'SEBELUMNYA'
+    const label: GrupTanggalNotifikasi['label'] =
+      kunci === 'HARI_INI' ? 'Hari Ini' : kunci === 'KEMARIN' ? 'Kemarin' : 'Sebelumnya'
+
+    const grup = peta.get(kunci) || {
+      kunci,
+      label,
+      jumlah: 0,
+      belumDibaca: 0,
+      items: [],
+    }
+    grup.items.push(item)
+    grup.jumlah += 1
+    if (!item.isRead) grup.belumDibaca += 1
+    peta.set(kunci, grup)
+  }
+
+  const urutan: GrupTanggalNotifikasi['kunci'][] = ['HARI_INI', 'KEMARIN', 'SEBELUMNYA']
+  return urutan
+    .map((kunci) => peta.get(kunci))
+    .filter((grup): grup is GrupTanggalNotifikasi => Boolean(grup))
+}
+
+const POLA_ID_PESANAN =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+const POLA_ID_PESANAN_GLOBAL =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+const POLA_NOMOR_PESANAN = /AKB-\d{8}-\d{6}/i
+const KATEGORI_PESANAN = new Set(['PEMBAYARAN', 'JADWAL', 'PESANAN'])
+
+/**
+ * Tautan detail pesanan hanya dibuat jika notifikasi benar-benar memuat
+ * ID/nomor pesanan. Tidak ada tautan rusak untuk notifikasi sistem/umum.
+ *
+ * Kandidat ID dikumpulkan dari entitas, kunci grup, dan pesan lalu dicocokkan
+ * ke daftar pesanan milik pengguna. Ini penting karena kunci seperti
+ * `bukti:diunggah:<idBukti>:<idPenerima>` dan `qris:diganti:<idQris>:<idPesanan>`
+ * memuat UUID yang bukan ID pesanan.
+ */
+export function tautanDetailPesanan(
+  item: Pick<NotifikasiItem, 'kategori' | 'entitasId' | 'groupKey' | 'message'>,
+  daftarPesanan: Array<{ id: string; orderNumber: string }> = []
+): string | null {
+  const teks = `${item.message || ''} ${item.groupKey || ''}`
+  const nomor = teks.match(POLA_NOMOR_PESANAN)?.[0] || null
+  const berkaitan = KATEGORI_PESANAN.has(String(item.kategori || '')) || Boolean(nomor)
+  if (!berkaitan) return null
+
+  const kandidat = [
+    ...(item.entitasId?.match(POLA_ID_PESANAN) || []),
+    ...(teks.match(POLA_ID_PESANAN_GLOBAL) || []),
+  ]
+
+  const cocokId = daftarPesanan.find((pesanan) => kandidat.includes(pesanan.id))
+  if (cocokId?.id) return `/pesanan/${cocokId.id}`
+
+  if (nomor) {
+    const cocokNomor = daftarPesanan.find(
+      (pesanan) => pesanan.orderNumber === nomor
+    )
+    if (cocokNomor?.id) return `/pesanan/${cocokNomor.id}`
+  }
+
+  const kunci = String(item.groupKey || '').toLowerCase()
+  const idJelasPesanan =
+    /^(pesanan|pengingat|jadwal|auto-cancel|refund):/.test(kunci) ||
+    (Boolean(item.entitasId?.match(POLA_ID_PESANAN)) &&
+      KATEGORI_PESANAN.has(String(item.kategori || '')))
+  if (!idJelasPesanan) return null
+
+  const id = kandidat[0]
+  return id ? `/pesanan/${id}` : null
 }

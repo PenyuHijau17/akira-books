@@ -2,7 +2,7 @@
 // Barrel export untuk semua komponen UI agar bisa di-import praktis dari @/components/ui
 
 export { Button } from "./Button"
-export { Input, Textarea } from "./Input"
+export { Input, Textarea, Select } from "./Input"
 export { Card, CardHeader, CardContent, CardFooter } from "./Card"
 export { Badge } from "./Badge"
 export { AlertBanner } from "./AlertBanner"

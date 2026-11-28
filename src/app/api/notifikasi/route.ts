@@ -32,6 +32,7 @@ export async function GET(request: Request) {
         userId: user.id,
         peran: user.role,
         limit: 1,
+        tanpaKonteks: true,
       })
       return NextResponse.json({ belumDibaca: hasil.belumDibaca })
     }

@@ -118,6 +118,7 @@ export type SessionUser = {
   email: string
   name: string | null
   whatsapp: string | null
+  avatarUrl?: string | null
   role: 'PENGUNGGUNG' | 'CUSTOMER' | 'ADMIN_BIASA' | 'ADMIN_UTAMA'
   isActive: boolean
 }
@@ -150,6 +151,7 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
     email: user.email,
     name: user.name,
     whatsapp: user.whatsapp,
+    avatarUrl: user.avatarUrl ?? null,
     role: user.role as SessionUser['role'],
     isActive: user.isActive,
   }

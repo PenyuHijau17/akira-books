@@ -6,8 +6,8 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import prisma from '@/lib/prisma'
 import { kirimEmailKeTerminal } from '@/lib/auth'
-import { kategoriDariKunci } from '@/lib/notifikasi'
 import { enqueueOutbox } from '@/lib/notifikasiServer'
+import { simpanNotifikasiBaku } from '@/lib/notifikasiPenyimpanan'
 
 export type BerkasServer = {
   name: string
@@ -137,38 +137,29 @@ export async function buatNotifikasi(params: {
   client?: any
 }) {
   const client = params.client ?? prisma()
-  // BR-003: kunci pengiriman bersifat per penerima, bukan global antar akun.
-  const sudah = await client.notification.findFirst({
-    where: { userId: params.userId, groupKey: params.groupKey },
-    select: { id: true },
+  // BR-008/BR-003: satu baris per penerima + jenis + konteks. Baris lama
+  // ditimpa agar pengingat berulang tidak menumpuk di database.
+  const dibuat = await simpanNotifikasiBaku({
+    userId: params.userId,
+    groupKey: params.groupKey,
+    message: params.message,
+    kategori: params.kategori,
+    entitasId: params.entitasId,
+    metadata: params.metadata,
+    client,
   })
-  if (sudah) return null
-
-  const dibuat = await client.notification.create({
-    data: {
-      userId: params.userId,
-      userUserId: params.userId,
-      groupKey: params.groupKey,
-      kategori: params.kategori || kategoriDariKunci(params.groupKey),
-      entitasId: params.entitasId || null,
-      metadata: params.metadata ?? null,
-      message: params.message,
-      isRead: false,
-      readAt: null,
-      retryCount: 0,
-    },
-  })
+  if (!dibuat) return null
 
   // Outbox persisten: IN_APP langsung tercatat terkirim, kanal eksternal mengikuti aturan retry.
   try {
     await enqueueOutbox({
       userId: params.userId,
-      groupKey: params.groupKey,
-      message: params.message,
+      groupKey: dibuat.groupKey,
+      message: dibuat.message,
       kanal: 'IN_APP',
       kategori: dibuat.kategori,
       entitasId: dibuat.entitasId,
-      deliveryKey: `in_app|${params.userId}|${params.groupKey}`,
+      deliveryKey: `in_app|${params.userId}|${dibuat.groupKey}`,
       client,
     })
   } catch (error) {

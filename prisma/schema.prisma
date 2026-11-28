@@ -26,6 +26,7 @@ model User {
   passwordHash  String
   name          String?
   whatsapp      String?
+  avatarUrl     String?     // Foto profil lokal: /uploads/avatars/<nama-berkas>
   role          Role
   isActive      Boolean     @default(true)
   deactivationReason String?
@@ -113,6 +114,19 @@ model BookCategory {
   bookId    String
   categoryId String
   @@unique([bookId, categoryId])
+}
+
+// Tanda buku / wishlist pelanggan: satu tandaan per pasangan pelanggan + buku.
+// Mengikuti pola ID scalar pada schema ini; keberadaan buku divalidasi server.
+// Tidak menyimpan modal/laba (GR-03).
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  bookId    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, bookId])
+  @@index([userId, createdAt])
 }
 
 // Riwayat harga modal (Admin Utama saja) - model terpisah dengan @relation

@@ -8,6 +8,7 @@ import { getSessionUser } from '@/lib/auth'
 import { boleLihatModalLaba, butuhAksesAdmin } from '@/lib/rbac'
 import { catatAudit } from '@/lib/pembayaranServer'
 import { dtoBuku } from '@/lib/buku'
+import { samakanNamaBuku } from '@/lib/normalisasiNama'
 
 function gagal(pesan: string, status: number) {
   return NextResponse.json({ error: pesan }, { status })
@@ -29,14 +30,25 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const hanyaNonaktifkan = Boolean(body?.hanyaNonaktifkan)
     const statusBaru = hanyaNonaktifkan ? 'NONAKTIF' : String(body?.status || bukuLama.status)
 
+    // Pencegahan typo saat ubah buku: spasi dirapikan dan ejaan Penulis/Penerbit
+    // disamakan dengan data yang sudah ada (case-insensitive).
+    const namaRapi = hanyaNonaktifkan
+      ? { author: bukuLama.author, publisher: bukuLama.publisher }
+      : await samakanNamaBuku(
+          body?.author ?? bukuLama.author,
+          body?.publisher ?? bukuLama.publisher
+        )
+
     const data: any = {
-      code: hanyaNonaktifkan ? bukuLama.code : String(body?.code ?? bukuLama.code),
+      // Kode buku bersifat permanen (dibuat otomatis saat pembuatan).
+      code: bukuLama.code,
       title: hanyaNonaktifkan ? bukuLama.title : String(body?.title ?? bukuLama.title),
-      author: hanyaNonaktifkan ? bukuLama.author : String(body?.author ?? bukuLama.author),
-      publisher: hanyaNonaktifkan ? bukuLama.publisher : String(body?.publisher ?? bukuLama.publisher),
+      author: namaRapi.author,
+      publisher: namaRapi.publisher,
       publishYear: hanyaNonaktifkan ? bukuLama.publishYear : Number(body?.publishYear ?? bukuLama.publishYear),
       imageUrl: hanyaNonaktifkan ? bukuLama.imageUrl : String(body?.imageUrl ?? bukuLama.imageUrl),
       description: hanyaNonaktifkan ? bukuLama.description : String(body?.description ?? bukuLama.description),
+      categoryId: hanyaNonaktifkan ? bukuLama.categoryId : String(body?.categoryId ?? bukuLama.categoryId),
       sellingPrice: hanyaNonaktifkan ? bukuLama.sellingPrice : Number(body?.sellingPrice ?? bukuLama.sellingPrice),
       stockTotal: hanyaNonaktifkan ? bukuLama.stockTotal : Number(body?.stockTotal ?? bukuLama.stockTotal),
       status: statusBaru,
@@ -77,6 +89,12 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     console.error('Gagal mengubah buku:', error)
     return gagal('Gagal mengubah buku', 500)
   }
+}
+
+// PATCH /api/admin/buku/[id] — pembaruan sebagian; memakai logika PUT yang sama
+// (termasuk normalisasi Penulis/Penerbit dan perlindungan GR-03).
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  return PUT(request, context)
 }
 
 // DELETE /api/admin/buku/[id] — hapus permanen, HANYA Admin Utama.

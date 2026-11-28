@@ -103,5 +103,24 @@ export const Textarea = ({ label, helperText, error, ...rest }: TextareaProps) =
   <Input as="textarea" label={label} helperText={helperText} error={error} {...rest} />
 )
 
+export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & {
+  label?: string
+  helperText?: string
+  error?: string
+  options: Array<{ value: string | number; label: string }>
+}
+
+/** Select — dropdown dengan gaya kertas klasik yang sama dengan Input. */
+export const Select = ({ label, helperText, error, options, ...rest }: SelectProps) => (
+  <Input
+    as="select"
+    label={label}
+    helperText={helperText}
+    error={error}
+    options={options}
+    {...rest}
+  />
+)
+
 /* Default export */
 export default Input

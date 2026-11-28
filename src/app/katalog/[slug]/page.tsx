@@ -1,16 +1,55 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+// src/app/katalog/[slug]/page.tsx
+// Next.js 16 + Cache Components: params dinamis berupa Promise. Nilainya
+// di-resolve di dalam effect (bukan dibaca sinkron saat render), sehingga
+// prerender tidak terhalang dan tidak muncul Issue "useParams outside Suspense".
+// Pola ini sama dengan halaman /pesanan/[id].
+
+import { useEffect, useState } from 'react'
 import { AlertBanner, Button } from '@/components/ui'
+import { TandaiBukuProvider, useTandaiBuku } from '@/components/TandaiBukuContext'
+import { TombolTandaiBuku } from '@/components/TombolTandaiBuku'
 
 export default function DetailBukuPage({
   params,
-}: { params: { slug: string } }) {
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  return (
+    <TandaiBukuProvider>
+      <DetailBukuKonten params={params} />
+    </TandaiBukuProvider>
+  )
+}
+
+function DetailBukuKonten({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  // null = params belum selesai dibaca; '' = slug tidak ada.
+  const [slug, setSlug] = useState<string | null>(null)
   const [book, setBook] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pesanKeranjang, setPesanKeranjang] = useState<{ jenis: 'success' | 'error'; teks: string } | null>(null)
   const [sedangMenambah, setSedangMenambah] = useState(false)
+  const { pesan: pesanTandai } = useTandaiBuku()
+
+  useEffect(() => {
+    let aktif = true
+    params
+      .then((p) => {
+        if (aktif) setSlug(String(p?.slug || ''))
+      })
+      .catch(() => {
+        if (aktif) setSlug('')
+      })
+    return () => {
+      aktif = false
+    }
+  }, [params])
 
   async function tambahKeKeranjang() {
     if (!book?.id) return
@@ -38,28 +77,43 @@ export default function DetailBukuPage({
   }
 
   useEffect(() => {
-    fetchDetail()
-  }, [])
+    // Masih menunggu params dari Next.js; jangan mengubah status loading.
+    if (slug === null) return
 
-  async function fetchDetail() {
+    if (!slug) {
+      setError('Buku tidak ditemukan')
+      setLoading(false)
+      return
+    }
+
+    let aktif = true
     setLoading(true)
     setError(null)
-    try {
-      const res = await fetch(`/api/katalog/${params.slug}`, {
-        cache: 'no-store',
-      })
-      if (!res.ok) throw new Error('Buku tidak ditemukan')
-      const data = await res.json()
-      // Cari buku yang cocok dengan slug (code)
-      const found = data.books.find((b: any) => b.code === params.slug)
-      if (!found) throw new Error('Buku tidak ditemukan')
-      setBook(found)
-    } catch (e: any) {
-      setError(e.message || 'Terjadi kesalahan')
-    } finally {
-      setLoading(false)
+
+    async function muatDetail() {
+      try {
+        const res = await fetch(`/api/katalog/${encodeURIComponent(slug as string)}`, {
+          cache: 'no-store',
+        })
+        if (!res.ok) throw new Error('Buku tidak ditemukan')
+        const data = await res.json()
+        const ditemukan = Array.isArray(data?.books)
+          ? data.books[0]
+          : data?.book ?? null
+        if (!ditemukan) throw new Error('Buku tidak ditemukan')
+        if (aktif) setBook(ditemukan)
+      } catch (e: any) {
+        if (aktif) setError(e?.message || 'Terjadi kesalahan')
+      } finally {
+        if (aktif) setLoading(false)
+      }
     }
-  }
+
+    muatDetail()
+    return () => {
+      aktif = false
+    }
+  }, [slug])
 
   if (loading) {
     return (
@@ -147,7 +201,6 @@ export default function DetailBukuPage({
               Rp {book?.sellingPrice?.toLocaleString('id-ID')}
             </p>
 
-            
             <div style={{ marginTop: '1rem' }}>
               {pesanKeranjang && (
                 <AlertBanner
@@ -163,9 +216,15 @@ export default function DetailBukuPage({
               >
                 Tambah ke Keranjang
               </Button>{' '}
+              <TombolTandaiBuku bookId={book?.id || ''} judul={book?.title || ''} />{' '}
               <a href="/keranjang" style={{ marginLeft: '0.5rem' }}>
                 Lihat Keranjang
               </a>
+              {pesanTandai && (
+                <p role="status" className="mt-2 text-sm text-[#3F6B45]">
+                  {pesanTandai}
+                </p>
+              )}
             </div>
 
             <p className="text-gray-500 text-sm mt-2">Stok Tersedia</p>

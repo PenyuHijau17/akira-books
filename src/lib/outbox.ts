@@ -103,12 +103,15 @@ export function penilaianPengirimanOutbox(args: {
   }
 }
 
-/** Pesan peringatan untuk Admin Utama; sengaja tidak memuat modal/laba (GR-03). */
+/**
+ * Pesan peringatan untuk Admin Utama. Kunci pengiriman sengaja tidak dicantumkan:
+ * itu jejak teknis internal, bukan informasi yang perlu dibaca pengguna (GR-03).
+ */
 export function pesanEskalasiOutbox(item: OutboxDasar): string {
   return (
     `Pengiriman ${String(item.kanal || 'IN_APP').toLowerCase()} gagal berulang ` +
-    `(${item.attempts}/${item.maxAttempts} percobaan) untuk notifikasi "${item.message}". ` +
-    `Kunci pengiriman: ${item.deliveryKey}. Perlu tindak lanjut Admin Utama.`
+    `(${item.attempts}/${item.maxAttempts} percobaan) untuk pemberitahuan berikut: ` +
+    `"${item.message}". Perlu tindak lanjut Admin Utama.`
   )
 }
 

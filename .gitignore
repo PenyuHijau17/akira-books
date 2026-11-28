@@ -28,6 +28,10 @@
 /backup-arsip/
 /storage/
 *.age
+
+# Foto profil yang diunggah pengguna (folder tetap ikut, isinya tidak)
+/public/uploads/avatars/*
+!/public/uploads/avatars/.gitkeep
 *kunci-privat*
 *age-private*
 

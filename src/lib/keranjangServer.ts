@@ -3,6 +3,7 @@
 // Semua akses DB WAJIB lewat prisma() dari src/lib/prisma.ts.
 
 import prisma from '@/lib/prisma'
+import { simpanNotifikasiBaku } from '@/lib/notifikasiPenyimpanan'
 import {
   hitungPenyesuaianKeranjang,
   hitungStokTersedia,
@@ -161,15 +162,13 @@ export async function muatKeranjang(userId: string): Promise<PayloadKeranjang> {
         },
       })
 
-      await tx.notification.create({
-        data: {
-          userId,
-          userUserId: userId,
-          groupKey: `keranjang:${keranjang.id}:${diperbarui.version}`,
-          message: pesan,
-          isRead: false,
-          retryCount: 0,
-        },
+      await simpanNotifikasiBaku({
+        userId,
+        groupKey: `keranjang:${keranjang.id}:${diperbarui.version}`,
+        message: pesan,
+        kategori: 'PESANAN',
+        entitasId: keranjang.id,
+        client: tx,
       })
 
       return diperbarui

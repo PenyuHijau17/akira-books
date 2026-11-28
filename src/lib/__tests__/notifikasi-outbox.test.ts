@@ -132,10 +132,12 @@ describe('Tahap 12 — outbox retry & eskalasi', () => {
       expect(final?.escalationNotified).toBe(true)
 
       const eskalasi = await db.notification.findMany({
-        where: { userId: adminUtama.id, groupKey: `outbox:gagal:${deliveryKey}` },
+        where: { userId: adminUtama.id, groupKey: 'outbox:gagal:EMAIL' },
       })
       expect(eskalasi).toHaveLength(1)
       expect(eskalasi[0].message).toContain('Admin Utama')
+      expect(eskalasi[0].message).not.toContain('Kunci pengiriman:')
+      expect(eskalasi[0].message).not.toContain(deliveryKey)
       expect((await daftarOutboxGagal()).some((x) => x.deliveryKey === deliveryKey)).toBe(true)
 
       // Status GAGAL tidak diproses ulang → tidak ada notifikasi eskalasi kedua.
@@ -145,7 +147,7 @@ describe('Tahap 12 — outbox retry & eskalasi', () => {
       })
       expect(ulang.diproses).toBe(0)
       expect(await db.notification.count({
-        where: { userId: adminUtama.id, groupKey: `outbox:gagal:${deliveryKey}` },
+        where: { userId: adminUtama.id, groupKey: 'outbox:gagal:EMAIL' },
       })).toBe(1)
 
       const ditindaklanjuti = await tandaiOutboxDitindaklanjuti({

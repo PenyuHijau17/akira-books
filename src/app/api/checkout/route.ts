@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server'
 import { getSessionUser } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { muatKeranjang } from '@/lib/keranjangServer'
+import { simpanNotifikasiBaku } from '@/lib/notifikasiPenyimpanan'
 import {
   cekIdempotensi,
   cekTokoBuka,
@@ -238,15 +239,13 @@ export async function POST(request: Request) {
             },
           })
 
-          await tx.notification.create({
-            data: {
-              userId: user.id,
-              userUserId: user.id,
-              groupKey: `pesanan:${pesanan.id}:dibuat`,
-              message: `Pesanan ${nomorPesanan} berhasil dibuat. Selesaikan pembayaran sebelum tenggat 24 jam.`,
-              isRead: false,
-              retryCount: 0,
-            },
+          await simpanNotifikasiBaku({
+            userId: user.id,
+            groupKey: `pesanan:${pesanan.id}:dibuat`,
+            message: `Pesanan ${nomorPesanan} berhasil dibuat. Selesaikan pembayaran sebelum tenggat 24 jam.`,
+            kategori: 'PESANAN',
+            entitasId: pesanan.id,
+            client: tx,
           })
 
           return pesanan

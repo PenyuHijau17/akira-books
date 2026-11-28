@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertBanner, Badge, Button, Card, CardContent, CardFooter, CardHeader, Input } from '@/components/ui'
+import { TEKS_BATAS_PENGAMBILAN } from '@/lib/detailPesanan'
 import { daftarMingguBerikutnya, TENGGAT_PEMBAYARAN_JAM } from '@/lib/pesanan'
 
 type ItemKeranjang = {
@@ -216,7 +217,7 @@ export default function CheckoutKlien() {
                     value: tanggal,
                     label: tanggal,
                   }))}
-                  helperText="Pengambilan hanya tersedia pada hari Minggu pukul 09.00 WIB."
+                  helperText={`Pengambilan hanya tersedia pada hari Minggu. ${TEKS_BATAS_PENGAMBILAN}`}
                 />
                 <Badge variant="info">Status awal: Menunggu Pembayaran</Badge>
                 <Badge variant="warning">Jadwal: Menunggu Konfirmasi</Badge>

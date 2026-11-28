@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Input, AlertBanner, Card, CardContent } from '@/components/ui'
+import { tentukanTujuanSetelahLogin } from '@/lib/admin-dashboard'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -21,10 +22,7 @@ export default function LoginPage() {
       .then((res) => res.json())
       .then((data) => {
         if (!aktif || !data?.user) return
-        const role = data.user.role
-        const tujuan =
-          role === 'ADMIN_UTAMA' || role === 'ADMIN_BIASA' ? '/admin/buku' : '/katalog'
-        router.replace(tujuan)
+        router.replace(tentukanTujuanSetelahLogin(data.user.role))
       })
       .catch(() => {
         /* abaikan */
@@ -48,7 +46,8 @@ export default function LoginPage() {
       const result = await response.json()
 
       if (response.ok && result.success && result.user) {
-        router.push(result.redirectUrl || '/katalog')
+        // Admin selalu masuk ke Dashboard Utama, walaupun API mengirim redirect lain.
+        router.push(tentukanTujuanSetelahLogin(result.user.role))
       } else {
         setError(result.error || 'Login gagal')
       }

@@ -9,6 +9,7 @@ import {
   parseSessionToken,
   getSessionUser,
 } from '@/lib/auth'
+import { tentukanTujuanSetelahLogin } from '@/lib/admin-dashboard'
 
 const SESSION_DAYS = 7
 
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
         email: user.email,
         name: user.name,
         whatsapp: user.whatsapp,
+        avatarUrl: user.avatarUrl ?? null,
         role: user.role,
       },
     })
@@ -109,6 +111,7 @@ export async function POST(request: Request) {
             id: user.id,
             email: user.email,
             name: user.name,
+            avatarUrl: user.avatarUrl ?? null,
             role: user.role,
           },
         },
@@ -169,9 +172,7 @@ export async function POST(request: Request) {
         },
       })
 
-      const isAdmin =
-        user.role === 'ADMIN_UTAMA' || user.role === 'ADMIN_BIASA'
-      const redirectUrl = isAdmin ? '/admin/buku' : '/katalog'
+      const redirectUrl = tentukanTujuanSetelahLogin(user.role)
 
       const response = NextResponse.json(
         {
@@ -180,6 +181,7 @@ export async function POST(request: Request) {
             id: user.id,
             email: user.email,
             name: user.name,
+            avatarUrl: user.avatarUrl ?? null,
             role: user.role,
           },
           redirectUrl,
@@ -237,6 +239,7 @@ export async function POST(request: Request) {
           email: updated.email,
           name: updated.name,
           whatsapp: updated.whatsapp,
+          avatarUrl: updated.avatarUrl ?? null,
           role: updated.role,
         },
       })

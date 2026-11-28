@@ -1,82 +1,64 @@
 import { NextResponse } from 'next/server'
+import { getSessionUser } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { bangunOrderKatalog, bangunWhereKatalog } from '@/lib/katalogFilter'
+import { daftarNamaUnik } from '@/lib/namaBuku'
+import { daftarIdTandaan, dtoBukuTandaan } from '@/lib/tandaiBuku'
 
-// GET /api/katalog - Daftar buku dengan pencarian, filter, dan pengurutan
+// GET /api/katalog - Daftar buku dengan pencarian, filter (kategori/penulis/penerbit), dan pengurutan.
+// GR-03: DTO publik tidak memuat costPrice / riwayat modal.
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q') || ''
     const kategori = searchParams.get('kategori') || ''
+    const penulis = searchParams.get('penulis') || ''
+    const penerbit = searchParams.get('penerbit') || ''
     const status = searchParams.get('status') || ''
     const sort = searchParams.get('sort') || 'terbaru'
+    const hanyaTandaan = searchParams.get('tandai') === '1'
 
-    // Build where clause untuk pencarian
-    const where: any = {
-      status: status || 'TERSEDIA', // Default hanya tampilkan buku tersedia
+    // Filter cepat "Hanya Buku Ditandai" hanya untuk Customer login (GR-02).
+    let idTandaan: string[] | null = null
+    if (hanyaTandaan) {
+      const user = await getSessionUser(request)
+      if (!user || user.role !== 'CUSTOMER') {
+        return NextResponse.json({ error: 'Tidak diizinkan' }, { status: 401 })
+      }
+      const baris = await prisma().wishlistItem.findMany({
+        where: { userId: user.id },
+        select: { bookId: true },
+      })
+      idTandaan = daftarIdTandaan(baris)
     }
 
-    // Pencarian judul/penulis/ISBN
-    if (query) {
-      where.OR = [
-        { title: { contains: query, mode: 'insensitive' } },
-        { author: { contains: query, mode: 'insensitive' } },
-        { code: { contains: query, mode: 'insensitive' } },
-      ]
-    }
+    const where = bangunWhereKatalog({ q: query, kategori, penulis, penerbit, status, sort })
+    if (idTandaan) where.id = { in: idTandaan }
+    const orderBy = bangunOrderKatalog(sort)
 
-    // Filter kategori - hubungkan via categoryId
-    if (kategori) {
-      where.categoryId = kategori
-    }
+    // Opsi filter diambil dari seluruh buku, bukan hanya hasil yang sedang difilter.
+    const [books, semuaBuku, daftarKategori] = await Promise.all([
+      prisma().book.findMany({ where, orderBy, take: 50 }),
+      prisma().book.findMany({ select: { author: true, publisher: true } }),
+      prisma().category.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    ])
 
-    // Pengurutan
-    const orderBy: any = {}
-    if (sort === 'harga_rendah') {
-      orderBy.sellingPrice = 'asc'
-    } else if (sort === 'harga_tinggi') {
-      orderBy.sellingPrice = 'desc'
-    } else {
-      // Default: terbaru
-      orderBy.id = 'desc'
-    }
+    const petaKategori = new Map(daftarKategori.map((item) => [item.id, item.name]))
 
-    const books = await prisma().book.findMany({
-      where,
-      include: {
-        // costPrice DIKELUARGAKAN untuk semua peran kecuali Admin Utama
-        //akan difilter di layer response di bawah
-        BookCostHistory: false, // Hilangkan cost history dari hasil
-      },
-      orderBy,
-      take: 50,
-    })
-
-    // Terapkan isolasi field modal (GR-03): costPrice tidak pernah terkirim ke Pengunjung, Customer, Admin Biasa
-    // Field costPrice hanya terlihat oleh Admin Utama
-    // Kami mengembalikan hanya field yang aman untuk publik
-    const safeBooks = books.map((book: any) => ({
-      id: book.id,
-      code: book.code,
-      title: book.title,
-      author: book.author,
-      publisher: book.publisher,
-      publishYear: book.publishYear,
-      imageUrl: book.imageUrl,
-      description: book.description,
-      sellingPrice: book.sellingPrice,
-      stockTotal: book.stockTotal,
-      status: book.status,
-      kategori: book.category?.name || '',
-      // Jika user adalah Admin Utama, kita bisa tambahkan costPrice,
-      // namun di API level kami tidak tahu role user, jadi kita kirim field kosong/null
-      // dan akan difilter lagi di middleware/server-side rendering
-      costPrice: null, // Akan difilter oleh middleware RBAC
-    }))
+    // Hanya field aman untuk publik; costPrice sengaja tidak disertakan sama sekali.
+    const safeBooks = books.map((book: any) =>
+      dtoBukuTandaan(book, petaKategori.get(book.categoryId) || '')
+    )
 
     return NextResponse.json({
       books: safeBooks,
       total: safeBooks.length,
-      filters: { query, kategori, status, sort },
+      filters: { query, kategori, penulis, penerbit, status: status || 'TERSEDIA', sort },
+      facets: {
+        kategori: daftarKategori.map((item) => ({ value: item.id, label: item.name })),
+        penulis: daftarNamaUnik(semuaBuku.map((book) => book.author)),
+        penerbit: daftarNamaUnik(semuaBuku.map((book) => book.publisher)),
+      },
     })
   } catch (error) {
     console.error('Error fetching katalog:', error)

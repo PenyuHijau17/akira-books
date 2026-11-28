@@ -7,7 +7,6 @@ import { kirimEmailKeTerminal } from '@/lib/auth'
 import { saringFieldModal } from '@/lib/pesanan'
 import {
   kategoriDariKunci,
-  kelompokkanNotifikasi,
   type KategoriNotifikasi,
 } from '@/lib/notifikasi'
 import {
@@ -17,6 +16,13 @@ import {
   type HasilPengiriman,
   type OutboxDasar,
 } from '@/lib/outbox'
+import type {
+  InfoPesananInbox,
+  InfoPenggunaInbox,
+  PeranInbox,
+} from '@/lib/inboxNotifikasi'
+import { simpanNotifikasiBaku } from '@/lib/notifikasiPenyimpanan'
+import { kelompokkanNotifikasiMenjadiKartu } from '@/lib/notifikasiKartu'
 
 type Klien = any
 
@@ -57,12 +63,65 @@ function kategoriValid(nilai: string | null | undefined): KategoriNotifikasi {
   return 'UMUM'
 }
 
+const POLA_ID_GLOBAL =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+const POLA_NOMOR_PESANAN = /AKB-\d{8}-\d{6}/gi
+
+/** Kumpulkan petunjuk pesanan dari notifikasi tanpa mengubah isi pesan. */
+function petunjukInbox(baris: Array<any>): { ids: string[]; nomor: string[] } {
+  const ids = new Set<string>()
+  const nomor = new Set<string>()
+  for (const n of baris) {
+    for (const nilai of [n.entitasId, n.groupKey, n.message]) {
+      for (const id of String(nilai || '').match(POLA_ID_GLOBAL) || []) ids.add(id)
+    }
+    const cocok = String(n.message || '').match(POLA_NOMOR_PESANAN)?.[0]
+    if (cocok) nomor.add(cocok)
+  }
+  return { ids: [...ids], nomor: [...nomor] }
+}
+
+/**
+ * Hubungkan notifikasi ke pesanan dan pemiliknya di server.
+ * Jika query pendukung gagal, inbox tetap tampil sebagai utas umum.
+ */
+async function konteksInbox(
+  client: Klien,
+  baris: Array<any>,
+  userId: string
+): Promise<{ pesanan: InfoPesananInbox[]; pengguna: InfoPenggunaInbox[] }> {
+  try {
+    const { ids, nomor } = petunjukInbox(baris)
+    const atau: any[] = []
+    if (ids.length) atau.push({ id: { in: ids } })
+    if (nomor.length) atau.push({ orderNumber: { in: nomor } })
+
+    const pesanan: InfoPesananInbox[] = atau.length
+      ? await client.order.findMany({
+          where: { OR: atau },
+          select: { id: true, orderNumber: true, customerId: true },
+        })
+      : []
+
+    const idsPengguna = [...new Set([userId, ...pesanan.map((p) => p.customerId)])]
+    const pengguna: InfoPenggunaInbox[] = await client.user.findMany({
+      where: { id: { in: idsPengguna } },
+      select: { id: true, name: true, avatarUrl: true },
+    })
+    return { pesanan, pengguna }
+  } catch (error) {
+    console.error('Gagal memuat konteks inbox:', error)
+    return { pesanan: [], pengguna: [] }
+  }
+}
+
 /** Daftar notifikasi milik satu akun + jumlah belum dibaca, sudah dikelompokkan (BR-003). */
 export async function daftarNotifikasiPengguna(args: {
   userId: string
   peran: string | null | undefined
   limit?: number
   client?: Klien
+  tanpaKonteks?: boolean
 }) {
   const client = args.client ?? prisma()
   const batas = Math.min(Math.max(1, Number(args.limit) || 100), 200)
@@ -87,11 +146,27 @@ export async function daftarNotifikasiPengguna(args: {
     createdAt: new Date(n.createdAt).toISOString(),
   }))
 
+  const konteks = args.tanpaKonteks
+    ? { pesanan: [] as InfoPesananInbox[], pengguna: [] as InfoPenggunaInbox[] }
+    : await konteksInbox(client, baris as Array<any>, args.userId)
+  const peranKartu: PeranInbox =
+    args.peran === 'ADMIN_UTAMA' || args.peran === 'ADMIN_BIASA'
+      ? args.peran
+      : 'CUSTOMER'
+  const kartu = args.tanpaKonteks
+    ? []
+    : kelompokkanNotifikasiMenjadiKartu(daftar as any, {
+        userId: args.userId,
+        peran: peranKartu,
+        pesanan: konteks.pesanan,
+        pengguna: konteks.pengguna,
+      })
+
   return saringNotifikasiUntukPeran(
     {
       belumDibaca,
       daftar,
-      grup: kelompokkanNotifikasi(daftar as any),
+      kartu,
     },
     args.peran
   )
@@ -269,21 +344,18 @@ export async function jalankanOutbox(args: {
         select: { id: true },
       })
       for (const admin of adminUtama as Array<{ id: string }>) {
-        const groupKey = `outbox:gagal:${baris.deliveryKey}`
-        const ada = await client.notification.findFirst({
-          where: { userId: admin.id, groupKey },
-          select: { id: true },
-        })
-        if (ada) continue
-        await client.notification.create({
-          data: {
-            userId: admin.id,
-            userUserId: admin.id,
-            groupKey,
-            kategori: 'SISTEM',
-            entitasId: baris.deliveryKey,
-            message: pesanEskalasiOutbox({ ...baris, attempts: keputusan.attempts } as OutboxDasar),
-          },
+        const kanal = String(baris.kanal || 'EMAIL').toUpperCase()
+        // Satu peringatan sistem per kanal: deliveryKey tidak boleh masuk kunci.
+        await simpanNotifikasiBaku({
+          userId: admin.id,
+          groupKey: `outbox:gagal:${kanal}`,
+          message: pesanEskalasiOutbox({
+            ...baris,
+            attempts: keputusan.attempts,
+          } as OutboxDasar),
+          kategori: 'SISTEM',
+          kanal,
+          client,
         })
       }
       eskalasi += 1

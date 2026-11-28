@@ -19,6 +19,7 @@ import {
   simpanBerkas,
   type BerkasServer,
 } from '@/lib/pembayaranServer'
+import { simpanNotifikasiBaku } from '@/lib/notifikasiPenyimpanan'
 
 function adalahBerkas(nilai: unknown): nilai is BerkasServer {
   return Boolean(
@@ -187,17 +188,15 @@ export async function POST(request: Request) {
             select: { id: true, orderNumber: true, customerId: true },
           })
           for (const pesanan of pesananAktif) {
-            await tx.notification.create({
-              data: {
-                userId: pesanan.customerId,
-                userUserId: pesanan.customerId,
-                groupKey: `qris:diganti:${qrisId}:${pesanan.id}`,
-                message:
-                  `QRIS toko telah diperbarui. Pesanan ${pesanan.orderNumber} ` +
-                  'mungkin menggunakan QRIS lama. Silakan lihat QRIS terbaru sebelum transfer.',
-                isRead: false,
-                retryCount: 0,
-              },
+            await simpanNotifikasiBaku({
+              userId: pesanan.customerId,
+              groupKey: `qris:diganti:${qrisId}:${pesanan.id}`,
+              message:
+                `QRIS toko telah diperbarui. Pesanan ${pesanan.orderNumber} ` +
+                'mungkin menggunakan QRIS lama. Silakan lihat QRIS terbaru sebelum transfer.',
+              kategori: 'PEMBAYARAN',
+              entitasId: pesanan.id,
+              client: tx,
             })
           }
 

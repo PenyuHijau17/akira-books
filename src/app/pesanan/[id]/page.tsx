@@ -4,7 +4,7 @@
 // Detail pesanan: snapshot buku, status, tenggat, QRIS, bukti bayar, dan pengajuan.
 // 100% Bahasa Indonesia, tema kertas klasik. GR-03: tidak ada field modal/laba.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertBanner,
@@ -16,6 +16,14 @@ import {
   CardHeader,
   Input,
 } from '@/components/ui'
+import {
+  TEKS_BATAS_PENGAMBILAN,
+  formatPengambilanRingkas,
+  jadwalMenungguKonfirmasi,
+  metodeMenungguKonfirmasi,
+  statusRefundBerlaku,
+  tenggatMenungguKonfirmasi,
+} from '@/lib/detailPesanan'
 import {
   labelStatusBukti,
   labelStatusJadwal,
@@ -149,6 +157,55 @@ function formatSisa(detik: number): string {
   return [jam, menit, detikAkhir].map((n) => String(n).padStart(2, '0')).join(':')
 }
 
+/** Panel aksi sekunder: tertutup secara default agar halaman detail tetap ringkas. */
+function PanelLipat({
+  judul,
+  children,
+}: {
+  judul: string
+  children: ReactNode
+}) {
+  const [buka, setBuka] = useState(false)
+  const idPanel = useId()
+
+  return (
+    <div style={{ border: '1px solid #d7ccc8', borderRadius: 8, overflow: 'hidden' }}>
+      <button
+        type="button"
+        aria-expanded={buka}
+        aria-controls={idPanel}
+        onClick={() => setBuka((nilai) => !nilai)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.5rem',
+          padding: '0.75rem 0.9rem',
+          border: 0,
+          background: '#faf6f0',
+          color: '#4d372d',
+          font: 'inherit',
+          fontWeight: 600,
+          textAlign: 'left',
+          cursor: 'pointer',
+        }}
+      >
+        <span>{judul}</span>
+        <span aria-hidden="true">{buka ? '▴' : '▾'}</span>
+      </button>
+      {buka && (
+        <div
+          id={idPanel}
+          style={{ display: 'grid', gap: '0.75rem', padding: '0.9rem', borderTop: '1px solid #d7ccc8' }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function HalamanDetailPesanan({
   params,
 }: {
@@ -271,6 +328,13 @@ export default function HalamanDetailPesanan({
     !!pesanan &&
     !['SELESAI', 'DIBATALKAN'].includes(pesanan.orderStatus) &&
     !pembayaranFinal
+
+  const jadwalTerkunci = jadwalMenungguKonfirmasi({
+    pickupStatus: pesanan?.pickupStatus,
+    usulanTertunda,
+  })
+  const metodeTerkunci = metodeMenungguKonfirmasi(pesanan?.methodChangeStatus)
+  const tenggatTerkunci = tenggatMenungguKonfirmasi(pesanan?.perpanjangan)
 
   const totalTerpilih = useMemo(() => {
     const semua = pesanan
@@ -604,9 +668,14 @@ export default function HalamanDetailPesanan({
             <CardContent style={{ display: 'grid', gap: '0.4rem' }}>
               <div>Status pembayaran: {labelStatusBukti(pesanan.paymentProofStatus)}</div>
               <div>Status jadwal: {labelStatusJadwal(pesanan.pickupStatus)}</div>
-              <div>Status refund: {labelStatusRefund(pesanan.refundStatus)}</div>
+              {statusRefundBerlaku(pesanan.refundStatus) && (
+                <div>Status refund: {labelStatusRefund(pesanan.refundStatus)}</div>
+              )}
               <div>Metode pembayaran: {pesanan.paymentMethod === 'QRIS' ? 'QRIS' : 'Tunai di Tempat (CFD)'}</div>
-              <div>Pengambilan: {tanggalLengkap(pesanan.pickupSundayDate)} WIB</div>
+              <div>
+                Pengambilan:{' '}
+                {formatPengambilanRingkas(pesanan.pickupSundayDate, tanggalMingguPendek)}
+              </div>
               <div>Tenggat pembayaran: {tanggalLengkap(pesanan.paymentDeadline)} WIB</div>
               <div>
                 Sisa waktu:{' '}
@@ -650,7 +719,9 @@ export default function HalamanDetailPesanan({
             </CardHeader>
             <CardContent style={{ display: 'grid', gap: '0.85rem' }}>
               <div style={{ color: '#5d4037' }}>
-                Tanggal aktif: {tanggalMingguPendek(pesanan.pickupSundayDate)} · tutup pukul 09.00 WIB
+                {formatPengambilanRingkas(pesanan.pickupSundayDate, (nilai) =>
+                  `Tanggal aktif: ${tanggalMingguPendek(nilai)}`
+                )}
               </div>
               {pesanan.pickupGroupId && (
                 <div style={{ color: '#5d4037' }}>
@@ -694,79 +765,100 @@ export default function HalamanDetailPesanan({
                 />
               )}
 
-              <Input
-                as="select"
-                label="Pilih tanggal Minggu di masa depan"
-                value={tanggalJadwal}
-                onChange={(e) => setTanggalJadwal(e.target.value)}
-                options={daftarMinggu.map((m) => ({ value: m, label: tanggalMingguPendek(m) }))}
-                helperText="Waktu pengambilan tetap pukul 09.00 WIB, tanpa pilihan jam."
-              />
-              <Input
-                as="textarea"
-                label="Alasan (wajib untuk ubah jadwal atau penolakan usulan)"
-                rows={2}
-                value={alasanJadwal}
-                onChange={(e) => setAlasanJadwal(e.target.value)}
-              />
-
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {usulanTertunda?.jenis === 'USULAN_ADMIN' ? (
-                  <>
-                    <Button
-                      onClick={() => kirimKeputusanUsulan('SETUJU_USULAN')}
-                      isLoading={sedangMemproses}
-                    >
-                      Setujui Usulan Admin
-                    </Button>
+              {jadwalTerkunci ? (
+                <>
+                  <AlertBanner
+                    type="info"
+                    title="Pengajuan jadwal menunggu konfirmasi"
+                    description={
+                      usulanTertunda?.jenis === 'PENGAJUAN_CUSTOMER'
+                        ? `Tanggal ${tanggalMingguPendek(usulanTertunda.tanggalBaru)} masih menunggu keputusan admin. Jadwal aktif tetap berlaku.`
+                        : 'Jadwal yang diajukan masih menunggu keputusan admin. Jadwal aktif tetap berlaku.'
+                    }
+                  />
+                  {usulanTertunda?.jenis === 'PENGAJUAN_CUSTOMER' ? (
                     <Button
                       variant="secondary"
-                      onClick={() => kirimKeputusanUsulan('TOLAK_USULAN')}
+                      onClick={() => kirimJadwal('BATAL_USULAN_SAYA')}
                       isLoading={sedangMemproses}
                     >
-                      Tolak Usulan Admin
+                      Batalkan Usulan Saya
                     </Button>
-                  </>
-                ) : (
-                  <>
-                    {['MENUNGGU_KONFIRMASI', 'PERLU_TANGGAL_BARU'].includes(
-                      pesanan.pickupStatus
-                    ) && (
-                      <Button onClick={() => kirimJadwal('PILIH_TANGGAL')} isLoading={sedangMemproses}>
-                        Ajukan Tanggal Ini
-                      </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onClick={() => kirimJadwal('BATAL_PENGAJUAN')}
+                      isLoading={sedangMemproses}
+                    >
+                      Batalkan Pengajuan
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <PanelLipat
+                  judul={
+                    usulanTertunda?.jenis === 'USULAN_ADMIN'
+                      ? 'Tanggapi Usulan Jadwal'
+                      : 'Ajukan Ubah Tanggal Pengambilan'
+                  }
+                >
+                  <Input
+                    as="select"
+                    label="Pilih tanggal Minggu di masa depan"
+                    value={tanggalJadwal}
+                    onChange={(e) => setTanggalJadwal(e.target.value)}
+                    options={daftarMinggu.map((m) => ({ value: m, label: tanggalMingguPendek(m) }))}
+                    helperText={TEKS_BATAS_PENGAMBILAN}
+                  />
+                  <Input
+                    as="textarea"
+                    label="Alasan (wajib untuk ubah jadwal atau penolakan usulan)"
+                    rows={2}
+                    value={alasanJadwal}
+                    onChange={(e) => setAlasanJadwal(e.target.value)}
+                  />
+
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {usulanTertunda?.jenis === 'USULAN_ADMIN' ? (
+                      <>
+                        <Button
+                          onClick={() => kirimKeputusanUsulan('SETUJU_USULAN')}
+                          isLoading={sedangMemproses}
+                        >
+                          Setujui Usulan Admin
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => kirimKeputusanUsulan('TOLAK_USULAN')}
+                          isLoading={sedangMemproses}
+                        >
+                          Tolak Usulan Admin
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        {['MENUNGGU_KONFIRMASI', 'PERLU_TANGGAL_BARU'].includes(
+                          pesanan.pickupStatus
+                        ) && (
+                          <Button onClick={() => kirimJadwal('PILIH_TANGGAL')} isLoading={sedangMemproses}>
+                            Ajukan Tanggal Ini
+                          </Button>
+                        )}
+                        {['DISETUJUI', 'TIDAK_HADIR', 'PERUBAHAN_MENUNGGU_PERSETUJUAN'].includes(
+                          pesanan.pickupStatus
+                        ) && (
+                          <Button
+                            onClick={() => kirimJadwal('AJUKAN_UBAH', true)}
+                            isLoading={sedangMemproses}
+                          >
+                            Ajukan Ubah Jadwal
+                          </Button>
+                        )}
+                      </>
                     )}
-                    {['DISETUJUI', 'TIDAK_HADIR', 'PERUBAHAN_MENUNGGU_PERSETUJUAN'].includes(
-                      pesanan.pickupStatus
-                    ) && (
-                      <Button
-                        onClick={() => kirimJadwal('AJUKAN_UBAH', true)}
-                        isLoading={sedangMemproses}
-                      >
-                        Ajukan Ubah Jadwal
-                      </Button>
-                    )}
-                    {pesanan.pickupStatus === 'MENUNGGU_KONFIRMASI' && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => kirimJadwal('BATAL_PENGAJUAN')}
-                        isLoading={sedangMemproses}
-                      >
-                        Batalkan Pengajuan
-                      </Button>
-                    )}
-                    {usulanTertunda?.jenis === 'PENGAJUAN_CUSTOMER' && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => kirimJadwal('BATAL_USULAN_SAYA')}
-                        isLoading={sedangMemproses}
-                      >
-                        Batalkan Usulan Saya
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+                  </div>
+                </PanelLipat>
+              )}
 
               {calonGabungan.length > 0 && (
                 <div style={{ borderTop: '1px solid #d7ccc8', paddingTop: '0.85rem' }}>
@@ -947,11 +1039,11 @@ export default function HalamanDetailPesanan({
                 </h2>
               </CardHeader>
               <CardContent style={{ display: 'grid', gap: '0.85rem' }}>
-                {pesanan.methodChangeStatus === 'MENUNGGU_PERSETUJUAN' ? (
+                {metodeTerkunci ? (
                   <>
                     <AlertBanner
                       type="info"
-                      title="Pengajuan menunggu keputusan"
+                      title="Pengajuan metode menunggu keputusan"
                       description={`Perubahan metode ke ${
                         pesanan.methodChangeTo === 'TUNAI_CFD'
                           ? 'Tunai di Tempat (CFD)'
@@ -967,7 +1059,7 @@ export default function HalamanDetailPesanan({
                     </Button>
                   </>
                 ) : (
-                  <>
+                  <PanelLipat judul="Ajukan Ubah Metode Pembayaran">
                     <Input
                       as="select"
                       label="Metode pembayaran yang diajukan"
@@ -988,35 +1080,42 @@ export default function HalamanDetailPesanan({
                     <Button onClick={() => ajukanMetode('AJUKAN')} isLoading={sedangMemproses}>
                       Ajukan Ubah Metode
                     </Button>
-                  </>
+                  </PanelLipat>
                 )}
 
-                <div style={{ borderTop: '1px solid #d7ccc8', paddingTop: '0.85rem' }}>
-                  <Input
-                    label="Tambahan waktu (jam, maksimal 168)"
-                    type="number"
-                    min={1}
-                    max={168}
-                    value={jamTambahan}
-                    onChange={(e) => setJamTambahan(e.target.value)}
-                    helperText="Pengajuan ini TIDAK menjeda hitung mundur pembayaran."
+                {tenggatTerkunci ? (
+                  <AlertBanner
+                    type="info"
+                    title="Perpanjangan tenggat menunggu keputusan"
+                    description="Pengajuan tambahan waktu masih menunggu keputusan admin. Hitung mundur pembayaran tetap berjalan."
                   />
-                  <Input
-                    as="textarea"
-                    label="Alasan perpanjangan tenggat"
-                    rows={2}
-                    value={alasanTenggat}
-                    onChange={(e) => setAlasanTenggat(e.target.value)}
-                  />
-                  <Button
-                    variant="secondary"
-                    onClick={ajukanTenggat}
-                    isLoading={sedangMemproses}
-                    style={{ marginTop: '0.75rem' }}
-                  >
-                    Ajukan Perpanjangan Tenggat
-                  </Button>
-                </div>
+                ) : (
+                  <PanelLipat judul="Ajukan Perpanjangan Tenggat">
+                    <Input
+                      label="Tambahan waktu (jam, maksimal 168)"
+                      type="number"
+                      min={1}
+                      max={168}
+                      value={jamTambahan}
+                      onChange={(e) => setJamTambahan(e.target.value)}
+                      helperText="Pengajuan ini TIDAK menjeda hitung mundur pembayaran."
+                    />
+                    <Input
+                      as="textarea"
+                      label="Alasan perpanjangan tenggat"
+                      rows={2}
+                      value={alasanTenggat}
+                      onChange={(e) => setAlasanTenggat(e.target.value)}
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={ajukanTenggat}
+                      isLoading={sedangMemproses}
+                    >
+                      Ajukan Perpanjangan Tenggat
+                    </Button>
+                  </PanelLipat>
+                )}
               </CardContent>
             </Card>
           )}
@@ -1050,7 +1149,7 @@ export default function HalamanDetailPesanan({
                   description="Customer tidak dapat membatalkan sendiri. Silakan hubungi admin untuk pembatalan dan pengajuan refund."
                 />
               ) : (
-                <>
+                <PanelLipat judul="Batalkan Pesanan">
                   <AlertBanner
                     type="warning"
                     title="Pembatalan bersifat final"
@@ -1064,16 +1163,12 @@ export default function HalamanDetailPesanan({
                     onChange={(e) => setAlasanPembatalan(e.target.value)}
                     helperText="Wajib diisi minimal 3 karakter."
                   />
-                </>
+                  <Button variant="danger" onClick={batalkanPesanan} isLoading={sedangMemproses}>
+                    Batalkan Pesanan Saya
+                  </Button>
+                </PanelLipat>
               )}
             </CardContent>
-            {bisaBatalkanSendiri && (
-              <CardFooter>
-                <Button variant="danger" onClick={batalkanPesanan} isLoading={sedangMemproses}>
-                  Batalkan Pesanan Saya
-                </Button>
-              </CardFooter>
-            )}
           </Card>
 
           <Card>
